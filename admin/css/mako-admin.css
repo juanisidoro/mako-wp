@@ -1,0 +1,229 @@
+/* MAKO Admin Styles */
+
+/* Stats Grid */
+.mako-stats-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 16px;
+	margin: 20px 0;
+}
+
+.mako-stat-card {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+	text-align: center;
+	border-left: 4px solid #10b981;
+}
+
+.mako-stat-number {
+	display: block;
+	font-size: 28px;
+	font-weight: 700;
+	color: #1d2327;
+	line-height: 1.2;
+}
+
+.mako-stat-label {
+	display: block;
+	font-size: 13px;
+	color: #646970;
+	margin-top: 4px;
+}
+
+/* Actions Bar */
+.mako-actions-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 16px 0;
+	flex-wrap: wrap;
+}
+
+.mako-status-message {
+	color: #646970;
+	font-style: italic;
+}
+
+/* Badge */
+.mako-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+	background: #f0f0f1;
+	color: #50575e;
+}
+
+.mako-badge-product { background: #fef3c7; color: #92400e; }
+.mako-badge-article { background: #dbeafe; color: #1e40af; }
+.mako-badge-docs { background: #e0e7ff; color: #3730a3; }
+.mako-badge-landing { background: #d1fae5; color: #065f46; }
+.mako-badge-profile { background: #ede9fe; color: #5b21b6; }
+.mako-badge-listing { background: #fce7f3; color: #9d174d; }
+.mako-badge-event { background: #fee2e2; color: #991b1b; }
+.mako-badge-recipe { background: #ecfccb; color: #3f6212; }
+.mako-badge-faq { background: #cffafe; color: #155e75; }
+.mako-badge-custom { background: #f0f0f1; color: #50575e; }
+
+/* Table */
+.mako-table th {
+	white-space: nowrap;
+}
+
+/* Empty State */
+.mako-empty-state {
+	text-align: center;
+	padding: 40px 20px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	margin-top: 16px;
+}
+
+.mako-empty-state p {
+	color: #646970;
+	font-size: 14px;
+}
+
+/* Meta Box */
+.mako-meta-box {
+	padding: 4px 0;
+}
+
+.mako-meta-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 0;
+	font-weight: 500;
+}
+
+.mako-meta-status--generated {
+	color: #10b981;
+}
+
+.mako-meta-status--pending {
+	color: #9ca3af;
+}
+
+.mako-meta-table {
+	width: 100%;
+	margin: 8px 0;
+	border-collapse: collapse;
+}
+
+.mako-meta-table td {
+	padding: 4px 0;
+	font-size: 13px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.mako-meta-table td:first-child {
+	color: #646970;
+	width: 40%;
+}
+
+.mako-meta-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+/* Preview Modal */
+.mako-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 100100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.mako-modal-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.mako-modal-content {
+	position: relative;
+	background: #fff;
+	border-radius: 8px;
+	width: 90%;
+	max-width: 800px;
+	max-height: 80vh;
+	display: flex;
+	flex-direction: column;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.mako-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 20px;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.mako-modal-header h3 {
+	margin: 0;
+	font-size: 16px;
+}
+
+.mako-modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: #6b7280;
+	padding: 0;
+	line-height: 1;
+}
+
+.mako-modal-close:hover {
+	color: #1f2937;
+}
+
+.mako-modal-body {
+	overflow-y: auto;
+	padding: 20px;
+}
+
+.mako-preview-code {
+	background: #1e293b;
+	color: #e2e8f0;
+	padding: 16px;
+	border-radius: 6px;
+	font-size: 13px;
+	line-height: 1.5;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	margin: 0;
+}
+
+/* Spinner */
+.mako-spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	border: 2px solid #e5e7eb;
+	border-top-color: #10b981;
+	border-radius: 50%;
+	animation: mako-spin 0.6s linear infinite;
+	vertical-align: middle;
+	margin-right: 6px;
+}
+
+@keyframes mako-spin {
+	to { transform: rotate(360deg); }
+}

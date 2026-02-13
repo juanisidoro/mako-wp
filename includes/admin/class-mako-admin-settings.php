@@ -1,0 +1,211 @@
+<?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class Mako_Admin_Settings {
+
+	public function register(): void {
+		add_action( 'admin_menu', array( $this, 'add_menu_pages' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+	}
+
+	public function add_menu_pages(): void {
+		// Dashboard top-level menu.
+		add_menu_page(
+			__( 'MAKO Dashboard', 'mako-wp' ),
+			'MAKO',
+			'manage_options',
+			'mako-dashboard',
+			array( $this, 'render_dashboard' ),
+			'dashicons-media-text',
+			80
+		);
+
+		// Settings as submenu under Settings.
+		add_options_page(
+			__( 'MAKO Settings', 'mako-wp' ),
+			__( 'MAKO', 'mako-wp' ),
+			'manage_options',
+			'mako-settings',
+			array( $this, 'render_settings' )
+		);
+	}
+
+	public function register_settings(): void {
+		// General section.
+		add_settings_section( 'mako_general', __( 'General', 'mako-wp' ), null, 'mako-settings' );
+
+		$this->add_checkbox( 'mako_enabled', __( 'Enable Plugin', 'mako-wp' ), 'mako_general' );
+		$this->add_checkbox( 'mako_auto_generate', __( 'Auto-generate on Publish', 'mako-wp' ), 'mako_general' );
+
+		register_setting( 'mako_settings', 'mako_enabled', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_auto_generate', array( 'type' => 'boolean', 'default' => true ) );
+
+		// Post types.
+		add_settings_field(
+			'mako_post_types',
+			__( 'Enabled Post Types', 'mako-wp' ),
+			array( $this, 'render_post_types_field' ),
+			'mako-settings',
+			'mako_general'
+		);
+		register_setting( 'mako_settings', 'mako_post_types', array(
+			'type'              => 'array',
+			'default'           => array( 'post', 'page' ),
+			'sanitize_callback' => array( $this, 'sanitize_post_types' ),
+		) );
+
+		// Content section.
+		add_settings_section( 'mako_content', __( 'Content', 'mako-wp' ), null, 'mako-settings' );
+
+		add_settings_field(
+			'mako_max_tokens',
+			__( 'Max Tokens per Page', 'mako-wp' ),
+			array( $this, 'render_number_field' ),
+			'mako-settings',
+			'mako_content',
+			array( 'name' => 'mako_max_tokens', 'default' => 1000, 'min' => 100, 'max' => 2000 )
+		);
+		register_setting( 'mako_settings', 'mako_max_tokens', array( 'type' => 'integer', 'default' => 1000 ) );
+
+		add_settings_field(
+			'mako_freshness_default',
+			__( 'Default Freshness', 'mako-wp' ),
+			array( $this, 'render_freshness_field' ),
+			'mako-settings',
+			'mako_content'
+		);
+		register_setting( 'mako_settings', 'mako_freshness_default', array( 'type' => 'string', 'default' => 'weekly' ) );
+
+		$this->add_checkbox( 'mako_include_tags', __( 'Include Tags/Categories', 'mako-wp' ), 'mako_content' );
+		$this->add_checkbox( 'mako_use_excerpt', __( 'Use Excerpt as Summary', 'mako-wp' ), 'mako_content' );
+		register_setting( 'mako_settings', 'mako_include_tags', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_use_excerpt', array( 'type' => 'boolean', 'default' => true ) );
+
+		// Headers & Discovery section.
+		add_settings_section( 'mako_headers', __( 'Headers & Discovery', 'mako-wp' ), null, 'mako-settings' );
+
+		$this->add_checkbox( 'mako_content_negotiation', __( 'Enable Content Negotiation', 'mako-wp' ), 'mako_headers' );
+		$this->add_checkbox( 'mako_alternate_link', __( 'Add &lt;link rel="alternate"&gt;', 'mako-wp' ), 'mako_headers' );
+		$this->add_checkbox( 'mako_sitemap_enabled', __( 'Enable /.well-known/mako.json', 'mako-wp' ), 'mako_headers' );
+		register_setting( 'mako_settings', 'mako_content_negotiation', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_alternate_link', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_sitemap_enabled', array( 'type' => 'boolean', 'default' => true ) );
+
+		add_settings_field(
+			'mako_cache_control',
+			__( 'Cache-Control Header', 'mako-wp' ),
+			array( $this, 'render_text_field' ),
+			'mako-settings',
+			'mako_headers',
+			array( 'name' => 'mako_cache_control', 'default' => 'public, max-age=3600', 'class' => 'regular-text' )
+		);
+		register_setting( 'mako_settings', 'mako_cache_control', array( 'type' => 'string', 'default' => 'public, max-age=3600' ) );
+
+		add_settings_field(
+			'mako_cache_ttl',
+			__( 'Cache TTL (seconds)', 'mako-wp' ),
+			array( $this, 'render_number_field' ),
+			'mako-settings',
+			'mako_headers',
+			array( 'name' => 'mako_cache_ttl', 'default' => 3600, 'min' => 0, 'max' => 86400 )
+		);
+		register_setting( 'mako_settings', 'mako_cache_ttl', array( 'type' => 'integer', 'default' => 3600 ) );
+	}
+
+	public function render_settings(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		require MAKO_PLUGIN_DIR . 'admin/views/settings.php';
+	}
+
+	public function render_dashboard(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		require MAKO_PLUGIN_DIR . 'admin/views/dashboard.php';
+	}
+
+	// --- Field renderers ---
+
+	public function render_post_types_field(): void {
+		$selected = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$types    = get_post_types( array( 'public' => true ), 'objects' );
+
+		foreach ( $types as $type ) {
+			if ( 'attachment' === $type->name ) {
+				continue;
+			}
+			printf(
+				'<label style="margin-right:16px"><input type="checkbox" name="mako_post_types[]" value="%s" %s> %s</label>',
+				esc_attr( $type->name ),
+				checked( in_array( $type->name, $selected, true ), true, false ),
+				esc_html( $type->labels->singular_name )
+			);
+		}
+	}
+
+	public function render_freshness_field(): void {
+		$current = get_option( 'mako_freshness_default', 'weekly' );
+		$options = array( 'realtime', 'hourly', 'daily', 'weekly', 'monthly', 'static' );
+
+		echo '<select name="mako_freshness_default">';
+		foreach ( $options as $opt ) {
+			printf(
+				'<option value="%s" %s>%s</option>',
+				esc_attr( $opt ),
+				selected( $current, $opt, false ),
+				esc_html( ucfirst( $opt ) )
+			);
+		}
+		echo '</select>';
+	}
+
+	public function render_number_field( array $args ): void {
+		$value = get_option( $args['name'], $args['default'] );
+		printf(
+			'<input type="number" name="%s" value="%s" min="%s" max="%s" class="small-text">',
+			esc_attr( $args['name'] ),
+			esc_attr( $value ),
+			esc_attr( $args['min'] ),
+			esc_attr( $args['max'] )
+		);
+	}
+
+	public function render_text_field( array $args ): void {
+		$value = get_option( $args['name'], $args['default'] );
+		printf(
+			'<input type="text" name="%s" value="%s" class="%s">',
+			esc_attr( $args['name'] ),
+			esc_attr( $value ),
+			esc_attr( $args['class'] ?? 'regular-text' )
+		);
+	}
+
+	public function sanitize_post_types( $value ): array {
+		if ( ! is_array( $value ) ) {
+			return array( 'post', 'page' );
+		}
+		return array_map( 'sanitize_key', $value );
+	}
+
+	private function add_checkbox( string $name, string $label, string $section ): void {
+		add_settings_field(
+			$name,
+			$label,
+			function () use ( $name ) {
+				$value = get_option( $name, true );
+				printf(
+					'<input type="checkbox" name="%s" value="1" %s>',
+					esc_attr( $name ),
+					checked( $value, true, false )
+				);
+			},
+			'mako-settings',
+			$section
+		);
+	}
+}
