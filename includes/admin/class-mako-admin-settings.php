@@ -304,10 +304,16 @@ class Mako_Admin_Settings {
 	 * the rounded rectangle. WordPress colorizes the single fill.
 	 */
 	private static function get_menu_icon(): string {
-		// Rounded rect (outer) + M letterform (inner, knocked out via evenodd).
-		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill-rule="evenodd">'
-			. '<path d="M4 0h12a4 4 0 014 4v12a4 4 0 01-4 4H4a4 4 0 01-4-4V4a4 4 0 014-4z'
-			. 'M5.2 15V5.6L10 12.4l4.8-6.8V15h-2v-5.6L10 13.2 7.2 9.4V15z" fill="black"/>'
+		// Rounded rect with M knocked out via evenodd.
+		// Outer: rounded rect 20x20 r4.
+		// Inner: M letterform - two diagonal strokes meeting at center peak.
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">'
+			. '<path fill-rule="evenodd" d="'
+			// Outer rounded rect.
+			. 'M4 0h12a4 4 0 014 4v12a4 4 0 01-4 4H4a4 4 0 01-4-4V4a4 4 0 014-4z'
+			// M letterform (counter-clockwise = knockout with evenodd).
+			. 'M4.5 15.5V4.5h2.2L10 10l3.3-5.5h2.2v11h-2.2V8.2L10 13.2 6.7 8.2v7.3z'
+			. '" fill="black"/>'
 			. '</svg>';
 
 		return 'data:image/svg+xml;base64,' . base64_encode( $svg );
