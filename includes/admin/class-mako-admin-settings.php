@@ -300,13 +300,14 @@ class Mako_Admin_Settings {
 	/**
 	 * SVG icon for the admin menu (base64-encoded).
 	 *
-	 * WordPress applies its own fill color, so the SVG uses `fill="black"`
-	 * as a placeholder that WP replaces with the appropriate admin color.
+	 * Uses fill-rule="evenodd" so the M letter is knocked out of
+	 * the rounded rectangle. WordPress colorizes the single fill.
 	 */
 	private static function get_menu_icon(): string {
-		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">'
-			. '<rect x="1" y="1" width="18" height="18" rx="4" fill="black" opacity="0.85"/>'
-			. '<text x="10" y="14.5" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="12" fill="white" text-anchor="middle">M</text>'
+		// Rounded rect (outer) + M letterform (inner, knocked out via evenodd).
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill-rule="evenodd">'
+			. '<path d="M4 0h12a4 4 0 014 4v12a4 4 0 01-4 4H4a4 4 0 01-4-4V4a4 4 0 014-4z'
+			. 'M5.2 15V5.6L10 12.4l4.8-6.8V15h-2v-5.6L10 13.2 7.2 9.4V15z" fill="black"/>'
 			. '</svg>';
 
 		return 'data:image/svg+xml;base64,' . base64_encode( $svg );
