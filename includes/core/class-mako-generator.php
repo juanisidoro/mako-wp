@@ -55,16 +55,17 @@ class Mako_Generator {
 
 		// Step 1: Get rendered HTML content.
 		$html = $this->get_rendered_content( $post );
-		if ( '' === trim( $html ) ) {
-			return null;
-		}
 
 		// Step 2: Count HTML tokens.
-		$html_tokens = $this->token_counter->count_html( $html );
+		$html_tokens = '' !== trim( $html ) ? $this->token_counter->count_html( $html ) : 0;
 
 		// Step 3-4: Convert HTML to clean Markdown.
-		$markdown = $this->converter->convert( $html, $site_url );
-		if ( '' === trim( $markdown ) ) {
+		$markdown = '' !== trim( $html ) ? $this->converter->convert( $html, $site_url ) : '';
+
+		// For WooCommerce products with empty content, generate from metadata.
+		if ( '' === trim( $markdown ) && 'product' === $post->post_type && function_exists( 'wc_get_product' ) ) {
+			$markdown = $post->post_title;
+		} elseif ( '' === trim( $markdown ) ) {
 			return null;
 		}
 
