@@ -18,8 +18,10 @@ class Mako_Admin {
 
 		// AJAX handlers.
 		add_action( 'wp_ajax_mako_generate', array( $this, 'ajax_generate' ) );
-		add_action( 'wp_ajax_mako_bulk_generate', array( $this, 'ajax_bulk_generate' ) );
+		add_action( 'wp_ajax_mako_generate_next', array( $this, 'ajax_generate_next' ) );
 		add_action( 'wp_ajax_mako_preview', array( $this, 'ajax_preview' ) );
+		add_action( 'wp_ajax_mako_flush_cache', array( $this, 'ajax_flush_cache' ) );
+		add_action( 'wp_ajax_mako_get_queue', array( $this, 'ajax_get_queue' ) );
 	}
 
 	public function enqueue_assets( string $hook ): void {
@@ -51,8 +53,21 @@ class Mako_Admin {
 				'generating'  => __( 'Generating...', 'mako-wp' ),
 				'generated'   => __( 'Generated', 'mako-wp' ),
 				'error'       => __( 'Error', 'mako-wp' ),
-				'confirm'     => __( 'Generate MAKO for all published posts?', 'mako-wp' ),
-				'bulkDone'    => __( 'Bulk generation complete!', 'mako-wp' ),
+				'bulkDone'    => __( 'All done! Generation complete.', 'mako-wp' ),
+				'starting'    => __( 'Starting generation:', 'mako-wp' ),
+				'pending'     => __( 'pending', 'mako-wp' ),
+				'totalPosts'  => __( 'total', 'mako-wp' ),
+				'savings'     => __( 'savings', 'mako-wp' ),
+				'skipped'     => __( 'Skipped', 'mako-wp' ),
+				'paused'      => __( 'Paused', 'mako-wp' ),
+				'pause'       => __( 'Pause', 'mako-wp' ),
+				'resume'      => __( 'Resume', 'mako-wp' ),
+				'resumed'     => __( 'Resumed', 'mako-wp' ),
+				'pausedMsg'   => __( 'Generation paused. Click Resume to continue.', 'mako-wp' ),
+				'stopped'     => __( 'Generation stopped by user.', 'mako-wp' ),
+				'testingOne'  => __( 'Testing with 1 post...', 'mako-wp' ),
+				'noPending'   => __( 'No pending posts to generate.', 'mako-wp' ),
+				'cacheFlushed' => __( 'Cache flushed successfully.', 'mako-wp' ),
 			),
 		) );
 	}
@@ -102,9 +117,9 @@ class Mako_Admin {
 	}
 
 	/**
-	 * AJAX: Bulk generate MAKO.
+	 * AJAX: Get the generation queue (posts pending MAKO).
 	 */
-	public function ajax_bulk_generate(): void {
+	public function ajax_get_queue(): void {
 		check_ajax_referer( 'mako_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -113,10 +128,10 @@ class Mako_Admin {
 
 		$enabled_types = Mako_Plugin::get_enabled_post_types();
 
-		$posts = get_posts( array(
+		$pending = get_posts( array(
 			'post_type'      => $enabled_types,
 			'post_status'    => 'publish',
-			'posts_per_page' => 50,
+			'posts_per_page' => -1,
 			'fields'         => 'ids',
 			'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
 				'relation' => 'OR',
@@ -131,22 +146,124 @@ class Mako_Admin {
 			),
 		) );
 
-		$generator = new Mako_Generator();
-		$storage   = new Mako_Storage();
-		$generated = 0;
-
-		foreach ( $posts as $post_id ) {
-			$result = $generator->generate( (int) $post_id );
-			if ( $result ) {
-				$storage->save( (int) $post_id, $result );
-				++$generated;
-			}
-		}
+		$total = get_posts( array(
+			'post_type'      => $enabled_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		) );
 
 		wp_send_json_success( array(
-			'generated' => $generated,
-			'remaining' => max( 0, count( $posts ) - $generated ),
+			'pending'   => count( $pending ),
+			'total'     => count( $total ),
+			'generated' => count( $total ) - count( $pending ),
 		) );
+	}
+
+	/**
+	 * AJAX: Generate MAKO for the next pending post.
+	 *
+	 * Processes one post at a time. The client controls the loop,
+	 * allowing pause/stop and rate limiting.
+	 */
+	public function ajax_generate_next(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
+
+		$posts = get_posts( array(
+			'post_type'      => $enabled_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+			'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+				'relation' => 'OR',
+				array(
+					'key'     => Mako_Storage::META_CONTENT,
+					'compare' => 'NOT EXISTS',
+				),
+				array(
+					'key'   => Mako_Storage::META_CONTENT,
+					'value' => '',
+				),
+			),
+		) );
+
+		if ( empty( $posts ) ) {
+			wp_send_json_success( array(
+				'done'      => true,
+				'remaining' => 0,
+			) );
+			return;
+		}
+
+		$post_id   = (int) $posts[0];
+		$post      = get_post( $post_id );
+		$generator = new Mako_Generator();
+		$result    = $generator->generate( $post_id );
+
+		if ( $result ) {
+			$storage = new Mako_Storage();
+			$storage->save( $post_id, $result );
+
+			// Count remaining.
+			$remaining = get_posts( array(
+				'post_type'      => $enabled_types,
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					'relation' => 'OR',
+					array(
+						'key'     => Mako_Storage::META_CONTENT,
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'   => Mako_Storage::META_CONTENT,
+						'value' => '',
+					),
+				),
+			) );
+
+			wp_send_json_success( array(
+				'done'        => false,
+				'post_id'     => $post_id,
+				'title'       => $post ? $post->post_title : '#' . $post_id,
+				'type'        => $result['type'],
+				'tokens'      => $result['tokens'],
+				'html_tokens' => $result['html_tokens'],
+				'savings'     => $result['savings'],
+				'remaining'   => count( $remaining ),
+			) );
+		} else {
+			wp_send_json_success( array(
+				'done'    => false,
+				'post_id' => $post_id,
+				'title'   => $post ? $post->post_title : '#' . $post_id,
+				'skipped' => true,
+				'reason'  => 'Could not generate MAKO content',
+			) );
+		}
+	}
+
+	/**
+	 * AJAX: Flush MAKO cache.
+	 */
+	public function ajax_flush_cache(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		delete_transient( 'mako_global_stats' );
+		delete_transient( 'mako_sitemap' );
+
+		wp_send_json_success( array( 'flushed' => true ) );
 	}
 
 	/**

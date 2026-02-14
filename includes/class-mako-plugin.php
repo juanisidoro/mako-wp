@@ -90,8 +90,8 @@ final class Mako_Plugin {
 			$negotiator->register();
 		}
 
-		// Auto-generate on publish.
-		if ( get_option( 'mako_auto_generate', true ) ) {
+		// Auto-generate on publish (disabled by default).
+		if ( get_option( 'mako_auto_generate', false ) ) {
 			add_action( 'save_post', array( $this, 'on_save_post' ), 20, 2 );
 		}
 

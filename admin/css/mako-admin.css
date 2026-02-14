@@ -32,19 +32,7 @@
 	margin-top: 4px;
 }
 
-/* Actions Bar */
-.mako-actions-bar {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin: 16px 0;
-	flex-wrap: wrap;
-}
-
-.mako-status-message {
-	color: #646970;
-	font-style: italic;
-}
+/* (Actions bar moved to Generation Panel) */
 
 /* Badge */
 .mako-badge {
@@ -71,6 +59,107 @@
 /* Table */
 .mako-table th {
 	white-space: nowrap;
+}
+
+/* Generation Panel */
+.mako-generation-panel {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 20px;
+	margin: 20px 0;
+}
+
+.mako-generation-panel h2 {
+	margin-top: 0;
+	padding-top: 0;
+}
+
+.mako-controls-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 16px 0 0;
+}
+
+.mako-controls-separator {
+	color: #c3c4c7;
+	margin: 0 4px;
+}
+
+/* Progress Bar */
+.mako-progress-container {
+	margin-top: 16px;
+}
+
+.mako-progress-info {
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 6px;
+	font-size: 13px;
+	color: #646970;
+}
+
+.mako-progress-bar {
+	height: 20px;
+	background: #f0f0f1;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.mako-progress-fill {
+	height: 100%;
+	background: #10b981;
+	border-radius: 10px;
+	transition: width 0.3s ease;
+}
+
+/* Log */
+.mako-log-container {
+	margin-top: 16px;
+	border: 1px solid #e5e7eb;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.mako-log-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 12px;
+	background: #f9fafb;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.mako-log {
+	max-height: 300px;
+	overflow-y: auto;
+	padding: 8px 12px;
+	background: #1e293b;
+	font-family: monospace;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.mako-log-entry {
+	color: #e2e8f0;
+}
+
+.mako-log-entry.mako-log-error {
+	color: #f87171;
+}
+
+.mako-log-entry.mako-log-skip {
+	color: #fbbf24;
+}
+
+.mako-log-entry.mako-log-done {
+	color: #34d399;
+}
+
+.mako-log-time {
+	color: #64748b;
 }
 
 /* Empty State */

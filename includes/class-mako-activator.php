@@ -10,7 +10,7 @@ class Mako_Activator {
 		// Default options.
 		add_option( 'mako_enabled', true );
 		add_option( 'mako_post_types', array( 'post', 'page' ) );
-		add_option( 'mako_auto_generate', true );
+		add_option( 'mako_auto_generate', false );
 		add_option( 'mako_freshness_default', 'weekly' );
 		add_option( 'mako_cache_ttl', 3600 );
 		add_option( 'mako_max_tokens', 1000 );

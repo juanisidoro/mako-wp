@@ -6,6 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Mako_Generator {
 
+	/**
+	 * Guard flag to prevent recursive self-fetch within the same process.
+	 */
+	private static bool $is_generating = false;
+
 	private Mako_Content_Converter $converter;
 	private Mako_Type_Detector $type_detector;
 	private Mako_Entity_Extractor $entity_extractor;
@@ -186,15 +191,70 @@ class Mako_Generator {
 	}
 
 	/**
-	 * Get rendered post content (applies shortcodes, blocks, etc.).
+	 * Get rendered HTML by fetching the public URL (self-fetch).
+	 *
+	 * This captures the final rendered output including page builders,
+	 * shortcodes, theme templates, and any plugin modifications —
+	 * exactly what a browser or LLM agent would see.
 	 */
 	private function get_rendered_content( WP_Post $post ): string {
-		$content = $post->post_content;
+		if ( self::$is_generating ) {
+			return '';
+		}
 
-		// Render blocks and shortcodes.
+		$url = get_permalink( $post->ID );
+		if ( ! $url ) {
+			return $this->get_rendered_content_fallback( $post );
+		}
+
+		self::$is_generating = true;
+
+		$args = array(
+			'timeout'     => (int) apply_filters( 'mako_self_fetch_timeout', 30 ),
+			'headers'     => array(
+				'Accept' => 'text/html',
+			),
+			'user-agent'  => 'MAKO-Generator/' . MAKO_VERSION . ' (WordPress/' . get_bloginfo( 'version' ) . ')',
+			'sslverify'   => (bool) apply_filters( 'mako_self_fetch_sslverify', ! ( defined( 'WP_DEBUG' ) && WP_DEBUG ) ),
+			'redirection' => 5,
+		);
+
+		$response = wp_remote_get( $url, $args );
+
+		self::$is_generating = false;
+
+		if ( is_wp_error( $response ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( 'MAKO self-fetch failed for post ' . $post->ID . ': ' . $response->get_error_message() );
+			}
+			return $this->get_rendered_content_fallback( $post );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( 'MAKO self-fetch got HTTP ' . $status . ' for post ' . $post->ID );
+			}
+			return $this->get_rendered_content_fallback( $post );
+		}
+
+		$html = wp_remote_retrieve_body( $response );
+		if ( '' === trim( $html ) ) {
+			return $this->get_rendered_content_fallback( $post );
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Fallback: render content from WordPress internals when self-fetch fails.
+	 */
+	private function get_rendered_content_fallback( WP_Post $post ): string {
+		$content = $post->post_content;
 		$content = apply_filters( 'the_content', $content );
 
-		// WooCommerce: append product-specific content.
 		if ( 'product' === $post->post_type && function_exists( 'wc_get_product' ) ) {
 			$product = wc_get_product( $post->ID );
 			if ( $product ) {

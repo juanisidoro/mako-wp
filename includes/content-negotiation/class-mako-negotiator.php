@@ -131,7 +131,7 @@ class Mako_Negotiator {
 
 		$path = wp_parse_url( $request_uri, PHP_URL_PATH );
 
-		if ( '/.well-known/mako.json' !== $path ) {
+		if ( '/mako-sitemap.json' !== $path ) {
 			return;
 		}
 
