@@ -8,7 +8,7 @@ class Mako_Content_Converter {
 
 	private const REMOVE_TAGS = array(
 		'script', 'style', 'noscript', 'iframe', 'svg', 'form',
-		'nav', 'footer', 'header', 'aside',
+		'nav', 'footer', 'header', 'aside', 'canvas', 'video', 'audio',
 	);
 
 	private const REMOVE_CLASSES = array(
@@ -16,16 +16,20 @@ class Mako_Content_Converter {
 		'cookie', 'consent', 'popup', 'modal', 'overlay',
 		'social-share', 'share-buttons', 'newsletter', 'subscribe',
 		'comments', 'comment-form', 'related-posts', 'breadcrumb',
-		'breadcrumbs', 'pagination', 'footer', 'copyright',
+		'breadcrumbs', 'pagination', 'copyright',
 	);
 
 	private const REMOVE_ROLES = array(
 		'navigation', 'banner', 'contentinfo', 'complementary',
 	);
 
-	private const CONTENT_SELECTORS = array(
-		'main', 'article', '.entry-content', '.post-content',
-		'.page-content', '.content', '.post', '.entry',
+	/**
+	 * Semantic tags whose text content should be extracted.
+	 */
+	private const SEMANTIC_TAGS = array(
+		'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+		'p', 'li', 'blockquote', 'figcaption',
+		'td', 'th', 'dt', 'dd', 'caption',
 	);
 
 	/**
@@ -50,9 +54,23 @@ class Mako_Content_Converter {
 
 		$content_node = $this->find_content_node( $xpath, $doc );
 
+		// Primary conversion: recursive DOM → markdown.
 		$markdown = $this->convert_node( $content_node, $base_url );
+		$markdown = $this->clean_markdown( $markdown );
 
-		return $this->clean_markdown( $markdown );
+		// If thin result, fallback to semantic extraction.
+		$text_length = mb_strlen( preg_replace( '/\s+/', '', $markdown ) );
+		if ( $text_length < 100 ) {
+			$semantic = $this->extract_semantic_content( $content_node, $base_url );
+			$semantic = $this->clean_markdown( $semantic );
+
+			$semantic_length = mb_strlen( preg_replace( '/\s+/', '', $semantic ) );
+			if ( $semantic_length > $text_length ) {
+				$markdown = $semantic;
+			}
+		}
+
+		return $markdown;
 	}
 
 	/**
@@ -110,7 +128,6 @@ class Mako_Content_Converter {
 	 * Find the main content node using priority selectors.
 	 */
 	private function find_content_node( DOMXPath $xpath, DOMDocument $doc ): DOMNode {
-		// Try semantic selectors.
 		$selectors_xpath = array(
 			'//main',
 			'//article',
@@ -118,7 +135,6 @@ class Mako_Content_Converter {
 			'//*[contains(concat(" ", normalize-space(@class), " "), " entry-content ")]',
 			'//*[contains(concat(" ", normalize-space(@class), " "), " post-content ")]',
 			'//*[contains(concat(" ", normalize-space(@class), " "), " page-content ")]',
-			'//*[contains(concat(" ", normalize-space(@class), " "), " content ")]',
 		);
 
 		foreach ( $selectors_xpath as $selector ) {
@@ -135,6 +151,94 @@ class Mako_Content_Converter {
 		}
 
 		return $doc->documentElement;
+	}
+
+	/**
+	 * Extract content from semantic HTML tags only.
+	 *
+	 * Fallback strategy for complex builder pages where recursive
+	 * conversion produces thin results. Walks the DOM and collects
+	 * text from h1-h6, p, li, td, blockquote, etc.
+	 */
+	private function extract_semantic_content( DOMNode $root, string $base_url ): string {
+		$blocks = array();
+		$seen   = array(); // For deduplication.
+
+		$this->collect_semantic_nodes( $root, $base_url, $blocks, $seen );
+
+		return implode( "\n\n", $blocks );
+	}
+
+	/**
+	 * Recursively collect content from semantic tags.
+	 */
+	private function collect_semantic_nodes( DOMNode $node, string $base_url, array &$blocks, array &$seen ): void {
+		if ( ! ( $node instanceof DOMElement ) ) {
+			// For non-element nodes, recurse into children.
+			if ( $node->hasChildNodes() ) {
+				foreach ( $node->childNodes as $child ) {
+					$this->collect_semantic_nodes( $child, $base_url, $blocks, $seen );
+				}
+			}
+			return;
+		}
+
+		$tag = strtolower( $node->tagName );
+
+		// If this is a semantic tag, convert it and stop recursion into it.
+		if ( in_array( $tag, self::SEMANTIC_TAGS, true ) ) {
+			$md = $this->convert_node( $node, $base_url );
+			$md = trim( $md );
+
+			// Skip empty or very short content.
+			$text_only = preg_replace( '/[#*_\[\]()>\-|`\s]+/', '', $md );
+			if ( mb_strlen( $text_only ) < 3 ) {
+				return;
+			}
+
+			// Deduplicate: skip if we've seen very similar text.
+			$hash = md5( strtolower( $text_only ) );
+			if ( isset( $seen[ $hash ] ) ) {
+				return;
+			}
+			$seen[ $hash ] = true;
+
+			$blocks[] = $md;
+			return;
+		}
+
+		// For lists (ul/ol), convert the whole list as a unit.
+		if ( 'ul' === $tag || 'ol' === $tag ) {
+			$md        = $this->convert_node( $node, $base_url );
+			$md        = trim( $md );
+			$text_only = preg_replace( '/[#*_\[\]()>\-|`\s\d.]+/', '', $md );
+
+			if ( mb_strlen( $text_only ) >= 5 ) {
+				$hash = md5( strtolower( $text_only ) );
+				if ( ! isset( $seen[ $hash ] ) ) {
+					$seen[ $hash ] = true;
+					$blocks[]      = $md;
+				}
+			}
+			return;
+		}
+
+		// For tables, convert the whole table.
+		if ( 'table' === $tag ) {
+			$md = $this->convert_node( $node, $base_url );
+			$md = trim( $md );
+			if ( '' !== $md ) {
+				$blocks[] = $md;
+			}
+			return;
+		}
+
+		// For non-semantic containers, recurse into children.
+		if ( $node->hasChildNodes() ) {
+			foreach ( $node->childNodes as $child ) {
+				$this->collect_semantic_nodes( $child, $base_url, $blocks, $seen );
+			}
+		}
 	}
 
 	/**
@@ -200,7 +304,6 @@ class Mako_Content_Converter {
 	}
 
 	private function convert_inline_code( DOMElement $node, string $children ): string {
-		// If inside <pre>, it's handled by convert_code_block.
 		if ( $node->parentNode && 'pre' === strtolower( $node->parentNode->nodeName ) ) {
 			return trim( $children );
 		}
@@ -233,13 +336,11 @@ class Mako_Content_Converter {
 			return $text;
 		}
 
-		// Skip non-http links.
 		if ( str_starts_with( $href, '#' ) || str_starts_with( $href, 'javascript:' )
 			|| str_starts_with( $href, 'mailto:' ) || str_starts_with( $href, 'tel:' ) ) {
 			return $text;
 		}
 
-		// Resolve relative URLs.
 		if ( $base_url && ! preg_match( '#^https?://#', $href ) ) {
 			$href = rtrim( $base_url, '/' ) . '/' . ltrim( $href, '/' );
 		}
@@ -263,8 +364,8 @@ class Mako_Content_Converter {
 	}
 
 	private function convert_list( DOMElement $node, string $base_url, bool $ordered ): string {
-		$items  = array();
-		$index  = 1;
+		$items = array();
+		$index = 1;
 
 		foreach ( $node->childNodes as $child ) {
 			if ( $child instanceof DOMElement && 'li' === strtolower( $child->tagName ) ) {
@@ -289,7 +390,6 @@ class Mako_Content_Converter {
 	private function convert_table( DOMElement $node, string $base_url ): string {
 		$rows = array();
 
-		// Extract header rows.
 		$thead = $node->getElementsByTagName( 'thead' );
 		if ( $thead->length > 0 ) {
 			foreach ( $thead->item( 0 )->getElementsByTagName( 'tr' ) as $tr ) {
@@ -297,28 +397,23 @@ class Mako_Content_Converter {
 			}
 		}
 
-		// Extract body rows.
-		$tbody = $node->getElementsByTagName( 'tbody' );
+		$tbody       = $node->getElementsByTagName( 'tbody' );
 		$body_source = $tbody->length > 0 ? $tbody->item( 0 ) : $node;
 
 		$first_body = true;
 		foreach ( $body_source->getElementsByTagName( 'tr' ) as $tr ) {
-			// Skip rows already captured in thead.
 			if ( $tr->parentNode && 'thead' === strtolower( $tr->parentNode->nodeName ) ) {
 				continue;
 			}
 			$row = $this->extract_table_row( $tr, $base_url );
 			if ( $first_body && empty( $rows ) ) {
-				// First body row becomes header.
 				$rows[] = $row;
 			}
 			if ( $first_body ) {
-				// Add separator after header.
 				$sep    = array_map( fn() => '---', $rows[0] );
 				$rows[] = $sep;
 				$first_body = false;
 				if ( count( $rows ) === 2 ) {
-					// First body row was used as header, now add this row as data.
 					continue;
 				}
 			}
@@ -348,7 +443,6 @@ class Mako_Content_Converter {
 	}
 
 	private function normalize_text( string $text ): string {
-		// Replace multiple whitespace with single space (but preserve newlines).
 		$text = preg_replace( '/[^\S\n]+/', ' ', $text );
 		return $text;
 	}
@@ -357,11 +451,10 @@ class Mako_Content_Converter {
 	 * Clean up generated markdown.
 	 */
 	private function clean_markdown( string $markdown ): string {
-		// Normalize line endings.
 		$markdown = str_replace( "\r\n", "\n", $markdown );
 		$markdown = str_replace( "\r", "\n", $markdown );
 
-		// Remove unicode whitespace characters.
+		// Remove unicode whitespace.
 		$markdown = preg_replace( '/[\x{00A0}\x{2000}-\x{200A}\x{202F}\x{205F}\x{3000}]/u', ' ', $markdown );
 
 		// Remove zero-width characters.

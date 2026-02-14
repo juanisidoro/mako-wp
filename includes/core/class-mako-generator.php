@@ -282,36 +282,28 @@ class Mako_Generator {
 			return $markdown;
 		}
 
-		// Build structured body using section templates.
+		// If there's substantial content, use it directly with a title heading.
+		$text_length = mb_strlen( preg_replace( '/\s+/', '', $markdown ) );
+		if ( $text_length >= 50 ) {
+			return '# ' . $entity . "\n\n" . $markdown;
+		}
+
+		// Very thin content: use section templates as scaffolding.
 		$sections = self::SECTION_MAP[ $type ] ?? null;
 		if ( ! $sections ) {
-			// No template (faq, custom): just add title and use markdown as-is.
 			return '# ' . $entity . "\n\n" . $markdown;
 		}
 
 		$sections = apply_filters( 'mako_section_template', $sections, $type );
 
-		// Split markdown into paragraphs.
-		$paragraphs = preg_split( '/\n{2,}/', trim( $markdown ), -1, PREG_SPLIT_NO_EMPTY );
-		$paragraphs = array_values( array_filter( $paragraphs, fn( $p ) => '' !== trim( $p ) ) );
-
 		$body = '# ' . $entity . "\n";
 
-		if ( ! empty( $paragraphs ) ) {
-			// Distribute paragraphs across sections.
-			$per_section = max( 1, (int) ceil( count( $paragraphs ) / count( $sections ) ) );
-			$chunks      = array_chunk( $paragraphs, $per_section );
+		if ( '' !== trim( $markdown ) ) {
+			$body .= "\n" . $markdown . "\n";
+		}
 
-			foreach ( $sections as $i => $section_title ) {
-				$body .= "\n## " . $section_title . "\n";
-				if ( isset( $chunks[ $i ] ) ) {
-					$body .= "\n" . implode( "\n\n", $chunks[ $i ] ) . "\n";
-				}
-			}
-		} else {
-			foreach ( $sections as $section_title ) {
-				$body .= "\n## " . $section_title . "\n\n";
-			}
+		foreach ( $sections as $section_title ) {
+			$body .= "\n## " . $section_title . "\n\n";
 		}
 
 		return $body;

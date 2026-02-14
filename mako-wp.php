@@ -3,7 +3,7 @@
  * Plugin Name:       MAKO - AI-Optimized Content
  * Plugin URI:        https://makospec.vercel.app
  * Description:       Serve LLM-optimized markdown content via HTTP content negotiation. Reduces token consumption by ~94% while preserving semantic meaning.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            MAKO Protocol
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MAKO_VERSION', '1.1.0' );
+define( 'MAKO_VERSION', '1.2.0' );
 define( 'MAKO_SPEC_VERSION', '1.0' );
 define( 'MAKO_PLUGIN_FILE', __FILE__ );
 define( 'MAKO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
