@@ -123,7 +123,7 @@ final class Mako_Plugin {
 			return;
 		}
 
-		$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
 		if ( ! in_array( $post->post_type, $enabled_types, true ) ) {
 			return;
 		}
@@ -157,7 +157,7 @@ final class Mako_Plugin {
 			return;
 		}
 
-		$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
 		$post_type     = get_post_type( $post_id );
 
 		if ( ! in_array( $post_type, $enabled_types, true ) ) {
@@ -199,6 +199,17 @@ final class Mako_Plugin {
 
 		$cron = new Mako_Cron();
 		$cron->register();
+	}
+
+	/**
+	 * Get enabled post types (safe - always returns array).
+	 */
+	public static function get_enabled_post_types(): array {
+		$types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		if ( ! is_array( $types ) ) {
+			return array( 'post', 'page' );
+		}
+		return $types;
 	}
 
 	public function get_generator(): Mako_Generator {

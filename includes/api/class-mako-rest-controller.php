@@ -241,7 +241,7 @@ class Mako_REST_Controller {
 
 		if ( empty( $post_ids ) ) {
 			// Auto-detect posts without MAKO.
-			$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+			$enabled_types = Mako_Plugin::get_enabled_post_types();
 			$post_ids      = get_posts( array(
 				'post_type'      => $enabled_types,
 				'post_status'    => 'publish',
@@ -311,7 +311,7 @@ class Mako_REST_Controller {
 	public function get_settings(): WP_REST_Response {
 		$settings = array(
 			'enabled'              => (bool) get_option( 'mako_enabled', true ),
-			'post_types'           => get_option( 'mako_post_types', array( 'post', 'page' ) ),
+			'post_types'           => Mako_Plugin::get_enabled_post_types(),
 			'auto_generate'        => (bool) get_option( 'mako_auto_generate', true ),
 			'freshness_default'    => get_option( 'mako_freshness_default', 'weekly' ),
 			'cache_ttl'            => (int) get_option( 'mako_cache_ttl', 3600 ),

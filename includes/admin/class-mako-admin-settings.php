@@ -132,8 +132,11 @@ class Mako_Admin_Settings {
 	// --- Field renderers ---
 
 	public function render_post_types_field(): void {
-		$selected = get_option( 'mako_post_types', array( 'post', 'page' ) );
-		$types    = get_post_types( array( 'public' => true ), 'objects' );
+		$selected = Mako_Plugin::get_enabled_post_types();
+		if ( ! is_array( $selected ) ) {
+			$selected = array( 'post', 'page' );
+		}
+		$types = get_post_types( array( 'public' => true ), 'objects' );
 
 		foreach ( $types as $type ) {
 			if ( 'attachment' === $type->name ) {

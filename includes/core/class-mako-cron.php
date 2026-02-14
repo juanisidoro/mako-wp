@@ -55,7 +55,7 @@ class Mako_Cron {
 	 * Process a batch of posts that need MAKO generation.
 	 */
 	public function process_bulk(): void {
-		$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
 
 		$post_ids = get_posts( array(
 			'post_type'      => $enabled_types,

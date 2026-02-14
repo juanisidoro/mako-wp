@@ -12,7 +12,7 @@ class Mako_Meta_Box {
 	}
 
 	public function add_meta_box(): void {
-		$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
 
 		foreach ( $enabled_types as $post_type ) {
 			add_meta_box(

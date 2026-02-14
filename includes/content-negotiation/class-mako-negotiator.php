@@ -51,7 +51,7 @@ class Mako_Negotiator {
 			return;
 		}
 
-		$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
 		$post_type     = get_post_type( $post_id );
 
 		if ( ! in_array( $post_type, $enabled_types, true ) ) {
@@ -146,7 +146,7 @@ class Mako_Negotiator {
 		if ( is_singular() ) {
 			$post_id = get_queried_object_id();
 			if ( $post_id ) {
-				$enabled_types = get_option( 'mako_post_types', array( 'post', 'page' ) );
+				$enabled_types = Mako_Plugin::get_enabled_post_types();
 				if ( in_array( get_post_type( $post_id ), $enabled_types, true ) ) {
 					header( 'Vary: Accept', false ); // Append, don't replace.
 				}
