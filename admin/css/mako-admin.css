@@ -291,6 +291,12 @@
 	font-size: 16px;
 }
 
+.mako-modal-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .mako-modal-close {
 	background: none;
 	border: none;

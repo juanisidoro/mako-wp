@@ -184,7 +184,12 @@ $enabled_types = Mako_Plugin::get_enabled_post_types();
 	<div class="mako-modal-content">
 		<div class="mako-modal-header">
 			<h3><?php esc_html_e( 'MAKO Preview', 'mako-wp' ); ?></h3>
-			<button class="mako-modal-close">&times;</button>
+			<div class="mako-modal-actions">
+				<button type="button" class="button button-small" id="mako-copy-preview">
+					<?php esc_html_e( 'Copy', 'mako-wp' ); ?>
+				</button>
+				<button class="mako-modal-close">&times;</button>
+			</div>
 		</div>
 		<div class="mako-modal-body">
 			<pre class="mako-preview-code" id="mako-preview-content"></pre>

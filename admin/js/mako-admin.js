@@ -360,6 +360,19 @@
 			deleteMako($(this).data('post-id'));
 		});
 
+		// Copy preview content.
+		$('#mako-copy-preview').on('click', function () {
+			var content = $('#mako-preview-content').text();
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(content).then(function () {
+					$('#mako-copy-preview').text(config.i18n.copied || 'Copied!');
+					setTimeout(function () {
+						$('#mako-copy-preview').text(config.i18n.copy || 'Copy');
+					}, 2000);
+				});
+			}
+		});
+
 		// Close modal.
 		$(document).on('click', '.mako-modal-close, .mako-modal-overlay', function () {
 			$('#mako-preview-modal').hide();

@@ -72,6 +72,8 @@ class Mako_Admin {
 				'confirmDelete'   => __( 'Delete MAKO content for this post?', 'mako-wp' ),
 				'deleted'         => __( 'MAKO content deleted.', 'mako-wp' ),
 				'noTypesSelected' => __( 'Select at least one post type.', 'mako-wp' ),
+				'copy'            => __( 'Copy', 'mako-wp' ),
+				'copied'          => __( 'Copied!', 'mako-wp' ),
 			),
 		) );
 	}
