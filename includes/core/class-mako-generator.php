@@ -343,11 +343,16 @@ class Mako_Generator {
 			return $summary;
 		}
 
-		// Fallback: first paragraph from markdown.
+		// Fallback: first text-only paragraph from markdown.
 		$paragraphs = preg_split( '/\n{2,}/', trim( $markdown ), -1, PREG_SPLIT_NO_EMPTY );
 		foreach ( $paragraphs as $para ) {
-			$clean = preg_replace( '/^#{1,6}\s+/', '', $para ); // Strip heading markers.
-			$clean = preg_replace( '/[*_\[\]()>`]/', '', $clean ); // Strip markdown formatting.
+			// Skip image-only paragraphs and headings.
+			if ( preg_match( '/^!\[/', trim( $para ) ) || preg_match( '/^#{1,6}\s/', trim( $para ) ) ) {
+				continue;
+			}
+			$clean = preg_replace( '/!\[[^\]]*\]\([^)]*\)/', '', $para ); // Strip images.
+			$clean = preg_replace( '/\[[^\]]*\]\([^)]*\)/', '', $clean ); // Strip links.
+			$clean = preg_replace( '/[*_\[\]()>`#]/', '', $clean ); // Strip markdown formatting.
 			$clean = preg_replace( '/\s+/', ' ', trim( $clean ) );
 
 			if ( mb_strlen( $clean ) >= 20 ) {

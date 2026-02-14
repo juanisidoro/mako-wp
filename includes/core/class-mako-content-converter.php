@@ -124,6 +124,16 @@ class Mako_Content_Converter {
 				}
 			}
 		}
+
+		// Remove screen-reader-only text (duplicates visible content).
+		$sr = $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " screen-reader-text ") or contains(concat(" ", normalize-space(@class), " "), " sr-only ")]' );
+		if ( $sr ) {
+			foreach ( $sr as $node ) {
+				if ( $node->parentNode ) {
+					$node->parentNode->removeChild( $node );
+				}
+			}
+		}
 	}
 
 	/**
@@ -272,12 +282,12 @@ class Mako_Content_Converter {
 			'p'          => "\n\n" . trim( $children ) . "\n\n",
 			'br'         => "\n",
 			'hr'         => "\n\n---\n\n",
-			'strong', 'b' => '**' . trim( $children ) . '**',
-			'em', 'i'    => '*' . trim( $children ) . '*',
+			'strong', 'b' => $this->convert_bold( $children ),
+			'em', 'i'    => $this->convert_italic( $children ),
 			'code'       => $this->convert_inline_code( $node, $children ),
 			'pre'        => $this->convert_code_block( $node ),
 			'a'          => $this->convert_link( $node, $children, $base_url ),
-			'img'        => $this->convert_image( $node, $base_url ),
+			'img'        => '', // Skip images: LLMs don't need image URLs.
 			'ul'         => "\n\n" . $this->convert_list( $node, $base_url, false ) . "\n\n",
 			'ol'         => "\n\n" . $this->convert_list( $node, $base_url, true ) . "\n\n",
 			'li'         => trim( $children ),
@@ -303,6 +313,30 @@ class Mako_Content_Converter {
 			$result .= $this->convert_node( $child, $base_url );
 		}
 		return $result;
+	}
+
+	private function convert_bold( string $children ): string {
+		$trimmed = trim( $children );
+		// Skip empty bold or bold wrapping only whitespace/newlines.
+		if ( '' === $trimmed || '' === preg_replace( '/\s+/', '', $trimmed ) ) {
+			return '';
+		}
+		// If content contains block elements (newlines), don't wrap in bold.
+		if ( str_contains( $trimmed, "\n" ) ) {
+			return $trimmed;
+		}
+		return '**' . $trimmed . '**';
+	}
+
+	private function convert_italic( string $children ): string {
+		$trimmed = trim( $children );
+		if ( '' === $trimmed ) {
+			return '';
+		}
+		if ( str_contains( $trimmed, "\n" ) ) {
+			return $trimmed;
+		}
+		return '*' . $trimmed . '*';
 	}
 
 	private function convert_inline_code( DOMElement $node, string $children ): string {
@@ -488,6 +522,9 @@ class Mako_Content_Converter {
 		}
 
 		$markdown = implode( "\n", $deduped );
+
+		// Remove stray bold/italic markers on their own line.
+		$markdown = preg_replace( '/^\*{1,3}$/m', '', $markdown );
 
 		// Collapse 3+ newlines to 2.
 		$markdown = preg_replace( '/\n{3,}/', "\n\n", $markdown );
