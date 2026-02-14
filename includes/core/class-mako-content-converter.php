@@ -113,8 +113,9 @@ class Mako_Content_Converter {
 			}
 		}
 
-		// Remove hidden elements.
-		$hidden = $xpath->query( '//*[@hidden] | //*[@aria-hidden="true"] | //*[contains(@style, "display:none")] | //*[contains(@style, "display: none")]' );
+		// Remove hidden elements (skip aria-hidden: too aggressive for server-rendered pages
+		// where carousels/sliders mark all slides as aria-hidden before JS runs).
+		$hidden = $xpath->query( '//*[@hidden] | //*[contains(@style, "display:none")] | //*[contains(@style, "display: none")]' );
 		if ( $hidden ) {
 			foreach ( $hidden as $node ) {
 				if ( $node->parentNode ) {
