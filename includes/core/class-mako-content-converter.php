@@ -12,11 +12,12 @@ class Mako_Content_Converter {
 	);
 
 	private const REMOVE_CLASSES = array(
-		'ad', 'ads', 'advertisement', 'sidebar', 'widget',
-		'cookie', 'consent', 'popup', 'modal', 'overlay',
+		'ads', 'advertisement', 'sidebar',
+		'cookie-notice', 'cookie-consent', 'consent-banner',
+		'popup', 'modal',
 		'social-share', 'share-buttons', 'newsletter', 'subscribe',
-		'comments', 'comment-form', 'related-posts', 'breadcrumb',
-		'breadcrumbs', 'pagination', 'copyright',
+		'comments', 'comment-form', 'related-posts',
+		'breadcrumb', 'breadcrumbs',
 	);
 
 	private const REMOVE_ROLES = array(
@@ -101,9 +102,9 @@ class Mako_Content_Converter {
 			}
 		}
 
-		// Remove by class name patterns.
+		// Remove by exact class name (word-boundary match only).
 		foreach ( self::REMOVE_CLASSES as $class ) {
-			$nodes = $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " ' . $class . ' ") or contains(@class, "' . $class . '")]' );
+			$nodes = $xpath->query( '//*[contains(concat(" ", normalize-space(@class), " "), " ' . $class . ' ")]' );
 			if ( $nodes ) {
 				foreach ( $nodes as $node ) {
 					if ( $node->parentNode ) {
