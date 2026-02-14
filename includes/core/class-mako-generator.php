@@ -328,42 +328,60 @@ class Mako_Generator {
 	}
 
 	/**
-	 * Derive a summary from post excerpt or content.
+	 * Derive a summary from post excerpt, SEO meta, or content.
 	 */
 	private function derive_summary( WP_Post $post, string $markdown ): string {
 		$max = 160;
 
-		// Prefer excerpt.
+		// 1. Post excerpt.
 		if ( get_option( 'mako_use_excerpt', true ) && '' !== trim( $post->post_excerpt ) ) {
-			$summary = wp_strip_all_tags( $post->post_excerpt );
-			$summary = preg_replace( '/\s+/', ' ', trim( $summary ) );
-			if ( mb_strlen( $summary ) > $max ) {
-				$summary = mb_substr( $summary, 0, $max - 3 ) . '...';
-			}
-			return $summary;
+			return $this->truncate_summary( wp_strip_all_tags( $post->post_excerpt ), $max );
 		}
 
-		// Fallback: first text-only paragraph from markdown.
+		// 2. SEO meta description (Yoast, RankMath).
+		$seo_desc = get_post_meta( $post->ID, '_yoast_wpseo_metadesc', true );
+		if ( empty( $seo_desc ) ) {
+			$seo_desc = get_post_meta( $post->ID, 'rank_math_description', true );
+		}
+		if ( ! empty( $seo_desc ) ) {
+			return $this->truncate_summary( $seo_desc, $max );
+		}
+
+		// 3. First substantial text paragraph from markdown.
 		$paragraphs = preg_split( '/\n{2,}/', trim( $markdown ), -1, PREG_SPLIT_NO_EMPTY );
 		foreach ( $paragraphs as $para ) {
-			// Skip image-only paragraphs and headings.
-			if ( preg_match( '/^!\[/', trim( $para ) ) || preg_match( '/^#{1,6}\s/', trim( $para ) ) ) {
+			$trimmed = trim( $para );
+			// Skip headings, images, links-only, prices, and very short lines.
+			if ( preg_match( '/^#{1,6}\s/', $trimmed ) ) {
 				continue;
 			}
-			$clean = preg_replace( '/!\[[^\]]*\]\([^)]*\)/', '', $para ); // Strip images.
-			$clean = preg_replace( '/\[[^\]]*\]\([^)]*\)/', '', $clean ); // Strip links.
-			$clean = preg_replace( '/[*_\[\]()>`#]/', '', $clean ); // Strip markdown formatting.
+			if ( preg_match( '/^!\[/', $trimmed ) ) {
+				continue;
+			}
+			$clean = preg_replace( '/!\[[^\]]*\]\([^)]*\)/', '', $para );
+			$clean = preg_replace( '/\[[^\]]*\]\([^)]*\)/', '', $clean );
+			$clean = preg_replace( '/[*_\[\]()>`#~=]/', '', $clean );
 			$clean = preg_replace( '/\s+/', ' ', trim( $clean ) );
 
-			if ( mb_strlen( $clean ) >= 20 ) {
-				if ( mb_strlen( $clean ) > $max ) {
-					return mb_substr( $clean, 0, $max - 3 ) . '...';
-				}
-				return $clean;
+			// Skip prices and short product names.
+			if ( preg_match( '/^\d+[,.]?\d*\s*€/', $clean ) ) {
+				continue;
+			}
+			if ( mb_strlen( $clean ) >= 30 ) {
+				return $this->truncate_summary( $clean, $max );
 			}
 		}
 
+		// 4. Fallback: entity name.
 		return '';
+	}
+
+	private function truncate_summary( string $text, int $max ): string {
+		$text = preg_replace( '/\s+/', ' ', trim( $text ) );
+		if ( mb_strlen( $text ) > $max ) {
+			return mb_substr( $text, 0, $max - 3 ) . '...';
+		}
+		return $text;
 	}
 
 	/**
