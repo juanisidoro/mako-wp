@@ -16,6 +16,14 @@
 		return new Date().toLocaleTimeString();
 	}
 
+	function getSelectedPostTypes() {
+		var types = [];
+		$('.mako-generate-type:checked').each(function () {
+			types.push($(this).val());
+		});
+		return types;
+	}
+
 	function logMessage(msg, type) {
 		var $log = $('#mako-log');
 		var $container = $('#mako-log-container');
@@ -32,7 +40,6 @@
 			'</div>'
 		);
 
-		// Auto-scroll to bottom.
 		$log.scrollTop($log[0].scrollHeight);
 	}
 
@@ -50,7 +57,6 @@
 	}
 
 	function setControls(state) {
-		// state: 'idle', 'running', 'paused'
 		$('#mako-test-one').prop('disabled', state !== 'idle');
 		$('#mako-start-bulk').prop('disabled', state !== 'idle');
 		$('#mako-pause-bulk').prop('disabled', state !== 'running').text(
@@ -109,6 +115,30 @@
 		});
 	}
 
+	// --- Delete MAKO ---
+
+	function deleteMako(postId) {
+		if (!confirm(config.i18n.confirmDelete || 'Delete MAKO content for this post?')) {
+			return;
+		}
+
+		$.post(config.ajaxUrl, {
+			action: 'mako_delete',
+			nonce: config.nonce,
+			post_id: postId
+		})
+		.done(function (response) {
+			if (response.success) {
+				$('#mako-row-' + postId).fadeOut(300, function () {
+					$(this).remove();
+				});
+				logMessage(config.i18n.deleted || 'MAKO deleted for post #' + postId, 'done');
+			} else {
+				alert(response.data || 'Delete failed');
+			}
+		});
+	}
+
 	// --- Bulk generation (one at a time) ---
 
 	function processNext() {
@@ -116,10 +146,17 @@
 			return;
 		}
 
-		$.post(config.ajaxUrl, {
+		var data = {
 			action: 'mako_generate_next',
 			nonce: config.nonce
-		})
+		};
+
+		var types = getSelectedPostTypes();
+		if (types.length > 0) {
+			data.post_types = types;
+		}
+
+		$.post(config.ajaxUrl, data)
 		.done(function (response) {
 			if (!response.success) {
 				logMessage(config.i18n.error + ': ' + (response.data || ''), 'error');
@@ -162,7 +199,6 @@
 				return;
 			}
 
-			// Schedule next with delay.
 			var delay = parseInt($('#mako-delay').val(), 10) || 3000;
 			bulkState.timer = setTimeout(processNext, delay);
 		})
@@ -173,11 +209,19 @@
 	}
 
 	function startBulk() {
-		// First, get the queue count.
-		$.post(config.ajaxUrl, {
+		var types = getSelectedPostTypes();
+		if (types.length === 0) {
+			logMessage(config.i18n.noTypesSelected || 'Select at least one post type.', 'error');
+			return;
+		}
+
+		var data = {
 			action: 'mako_get_queue',
-			nonce: config.nonce
-		})
+			nonce: config.nonce,
+			post_types: types
+		};
+
+		$.post(config.ajaxUrl, data)
 		.done(function (response) {
 			if (!response.success) {
 				logMessage(config.i18n.error, 'error');
@@ -185,6 +229,12 @@
 			}
 
 			var d = response.data;
+
+			if (d.pending === 0) {
+				logMessage(config.i18n.noPending, 'done');
+				return;
+			}
+
 			bulkState.total = d.pending + d.generated;
 			bulkState.processed = d.generated;
 			bulkState.running = true;
@@ -205,13 +255,11 @@
 
 	function pauseBulk() {
 		if (bulkState.paused) {
-			// Resume.
 			bulkState.paused = false;
 			setControls('running');
 			logMessage(config.i18n.resumed);
 			processNext();
 		} else {
-			// Pause.
 			bulkState.paused = true;
 			if (bulkState.timer) {
 				clearTimeout(bulkState.timer);
@@ -233,13 +281,22 @@
 	}
 
 	function testOne() {
+		var types = getSelectedPostTypes();
+		if (types.length === 0) {
+			logMessage(config.i18n.noTypesSelected || 'Select at least one post type.', 'error');
+			return;
+		}
+
 		setControls('running');
 		logMessage(config.i18n.testingOne);
 
-		$.post(config.ajaxUrl, {
+		var data = {
 			action: 'mako_generate_next',
-			nonce: config.nonce
-		})
+			nonce: config.nonce,
+			post_types: types
+		};
+
+		$.post(config.ajaxUrl, data)
 		.done(function (response) {
 			if (!response.success) {
 				logMessage(config.i18n.error + ': ' + (response.data || ''), 'error');
@@ -272,7 +329,6 @@
 			}
 
 			setControls('idle');
-			// Reload after a moment to update the table.
 			setTimeout(function () {
 				window.location.reload();
 			}, 2000);
@@ -286,7 +342,7 @@
 	// --- Event handlers ---
 
 	$(document).ready(function () {
-		// Single generate (meta box).
+		// Single generate (meta box + dashboard regen).
 		$(document).on('click', '.mako-btn-generate, .mako-btn-regenerate', function (e) {
 			e.preventDefault();
 			generateMako($(this).data('post-id'), $(this));
@@ -296,6 +352,12 @@
 		$(document).on('click', '.mako-btn-preview', function (e) {
 			e.preventDefault();
 			previewMako($(this).data('post-id'));
+		});
+
+		// Delete MAKO.
+		$(document).on('click', '.mako-btn-delete-mako', function (e) {
+			e.preventDefault();
+			deleteMako($(this).data('post-id'));
 		});
 
 		// Close modal.

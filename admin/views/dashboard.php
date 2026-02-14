@@ -3,9 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$storage = new Mako_Storage();
-$stats   = $storage->get_stats();
-$posts   = $storage->get_generated_posts( 20 );
+$storage       = new Mako_Storage();
+$stats         = $storage->get_stats();
+$posts         = $storage->get_generated_posts( 50 );
+$enabled_types = Mako_Plugin::get_enabled_post_types();
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'MAKO Dashboard', 'mako-wp' ); ?></h1>
@@ -36,6 +37,25 @@ $posts   = $storage->get_generated_posts( 20 );
 		<p class="description">
 			<?php esc_html_e( 'MAKO fetches the public URL of each page to capture the final rendered HTML, then converts it to optimized markdown. This process is safe and does not modify your content.', 'mako-wp' ); ?>
 		</p>
+
+		<!-- Post Type Filter -->
+		<div class="mako-type-filter">
+			<strong><?php esc_html_e( 'Generate for:', 'mako-wp' ); ?></strong>
+			<?php
+			$type_labels = array(
+				'post'    => __( 'Posts', 'mako-wp' ),
+				'page'    => __( 'Pages', 'mako-wp' ),
+				'product' => __( 'Products', 'mako-wp' ),
+			);
+			foreach ( $enabled_types as $pt ) :
+				$label = $type_labels[ $pt ] ?? $pt;
+			?>
+				<label class="mako-type-checkbox">
+					<input type="checkbox" class="mako-generate-type" value="<?php echo esc_attr( $pt ); ?>" checked>
+					<?php echo esc_html( $label ); ?>
+				</label>
+			<?php endforeach; ?>
+		</div>
 
 		<div class="mako-controls-row">
 			<button type="button" class="button" id="mako-test-one">
@@ -115,11 +135,12 @@ $posts   = $storage->get_generated_posts( 20 );
 				<th><?php esc_html_e( 'MAKO Tokens', 'mako-wp' ); ?></th>
 				<th><?php esc_html_e( 'Savings', 'mako-wp' ); ?></th>
 				<th><?php esc_html_e( 'Updated', 'mako-wp' ); ?></th>
+				<th><?php esc_html_e( 'Actions', 'mako-wp' ); ?></th>
 			</tr>
 		</thead>
 		<tbody>
 			<?php foreach ( $posts as $item ) : ?>
-			<tr>
+			<tr id="mako-row-<?php echo esc_attr( $item['post_id'] ); ?>">
 				<td>
 					<strong>
 						<a href="<?php echo esc_url( get_edit_post_link( $item['post_id'] ) ); ?>">
@@ -133,6 +154,19 @@ $posts   = $storage->get_generated_posts( 20 );
 				<td><?php echo esc_html( number_format( $item['tokens'] ) ); ?></td>
 				<td><strong><?php echo esc_html( $item['savings'] ); ?>%</strong></td>
 				<td><?php echo esc_html( $item['updated_at'] ? wp_date( 'Y-m-d H:i', strtotime( $item['updated_at'] ) ) : '-' ); ?></td>
+				<td>
+					<button type="button" class="button-link mako-btn-preview" data-post-id="<?php echo esc_attr( $item['post_id'] ); ?>" title="<?php esc_attr_e( 'Preview', 'mako-wp' ); ?>">
+						<?php esc_html_e( 'Preview', 'mako-wp' ); ?>
+					</button>
+					<span class="mako-action-sep">|</span>
+					<button type="button" class="button-link mako-btn-regenerate" data-post-id="<?php echo esc_attr( $item['post_id'] ); ?>" title="<?php esc_attr_e( 'Regenerate', 'mako-wp' ); ?>">
+						<?php esc_html_e( 'Regen', 'mako-wp' ); ?>
+					</button>
+					<span class="mako-action-sep">|</span>
+					<button type="button" class="button-link mako-btn-delete-mako" data-post-id="<?php echo esc_attr( $item['post_id'] ); ?>" title="<?php esc_attr_e( 'Delete MAKO', 'mako-wp' ); ?>">
+						<span style="color:#b32d2e"><?php esc_html_e( 'Delete', 'mako-wp' ); ?></span>
+					</button>
+				</td>
 			</tr>
 			<?php endforeach; ?>
 		</tbody>
@@ -142,4 +176,18 @@ $posts   = $storage->get_generated_posts( 20 );
 			<p><?php esc_html_e( 'No MAKO content generated yet. Use "Test 1 Post" to verify everything works, then "Start Generation" to process all pending pages.', 'mako-wp' ); ?></p>
 		</div>
 	<?php endif; ?>
+</div>
+
+<!-- Preview Modal -->
+<div id="mako-preview-modal" class="mako-modal" style="display:none">
+	<div class="mako-modal-overlay"></div>
+	<div class="mako-modal-content">
+		<div class="mako-modal-header">
+			<h3><?php esc_html_e( 'MAKO Preview', 'mako-wp' ); ?></h3>
+			<button class="mako-modal-close">&times;</button>
+		</div>
+		<div class="mako-modal-body">
+			<pre class="mako-preview-code" id="mako-preview-content"></pre>
+		</div>
+	</div>
 </div>

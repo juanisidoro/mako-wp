@@ -20,6 +20,7 @@ class Mako_Admin {
 		add_action( 'wp_ajax_mako_generate', array( $this, 'ajax_generate' ) );
 		add_action( 'wp_ajax_mako_generate_next', array( $this, 'ajax_generate_next' ) );
 		add_action( 'wp_ajax_mako_preview', array( $this, 'ajax_preview' ) );
+		add_action( 'wp_ajax_mako_delete', array( $this, 'ajax_delete' ) );
 		add_action( 'wp_ajax_mako_flush_cache', array( $this, 'ajax_flush_cache' ) );
 		add_action( 'wp_ajax_mako_get_queue', array( $this, 'ajax_get_queue' ) );
 	}
@@ -67,7 +68,10 @@ class Mako_Admin {
 				'stopped'     => __( 'Generation stopped by user.', 'mako-wp' ),
 				'testingOne'  => __( 'Testing with 1 post...', 'mako-wp' ),
 				'noPending'   => __( 'No pending posts to generate.', 'mako-wp' ),
-				'cacheFlushed' => __( 'Cache flushed successfully.', 'mako-wp' ),
+				'cacheFlushed'    => __( 'Cache flushed successfully.', 'mako-wp' ),
+				'confirmDelete'   => __( 'Delete MAKO content for this post?', 'mako-wp' ),
+				'deleted'         => __( 'MAKO content deleted.', 'mako-wp' ),
+				'noTypesSelected' => __( 'Select at least one post type.', 'mako-wp' ),
 			),
 		) );
 	}
@@ -126,10 +130,10 @@ class Mako_Admin {
 			wp_send_json_error( 'Insufficient permissions' );
 		}
 
-		$enabled_types = Mako_Plugin::get_enabled_post_types();
+		$post_types = $this->get_requested_post_types();
 
 		$pending = get_posts( array(
-			'post_type'      => $enabled_types,
+			'post_type'      => $post_types,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
@@ -147,7 +151,7 @@ class Mako_Admin {
 		) );
 
 		$total = get_posts( array(
-			'post_type'      => $enabled_types,
+			'post_type'      => $post_types,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
@@ -173,10 +177,10 @@ class Mako_Admin {
 			wp_send_json_error( 'Insufficient permissions' );
 		}
 
-		$enabled_types = Mako_Plugin::get_enabled_post_types();
+		$post_types = $this->get_requested_post_types();
 
 		$posts = get_posts( array(
-			'post_type'      => $enabled_types,
+			'post_type'      => $post_types,
 			'post_status'    => 'publish',
 			'posts_per_page' => 1,
 			'fields'         => 'ids',
@@ -212,7 +216,7 @@ class Mako_Admin {
 
 			// Count remaining.
 			$remaining = get_posts( array(
-				'post_type'      => $enabled_types,
+				'post_type'      => $post_types,
 				'post_status'    => 'publish',
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
@@ -267,6 +271,27 @@ class Mako_Admin {
 	}
 
 	/**
+	 * AJAX: Delete MAKO content for a post.
+	 */
+	public function ajax_delete(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$post_id = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
+		if ( ! $post_id ) {
+			wp_send_json_error( 'Invalid post ID' );
+		}
+
+		$storage = new Mako_Storage();
+		$storage->delete( $post_id );
+
+		wp_send_json_success( array( 'deleted' => true ) );
+	}
+
+	/**
 	 * AJAX: Preview MAKO content.
 	 */
 	public function ajax_preview(): void {
@@ -298,5 +323,21 @@ class Mako_Admin {
 			'content' => $data['content'],
 			'headers' => $data['headers'],
 		) );
+	}
+
+	/**
+	 * Get post types from the AJAX request, validated against enabled types.
+	 */
+	private function get_requested_post_types(): array {
+		$enabled_types = Mako_Plugin::get_enabled_post_types();
+
+		if ( empty( $_POST['post_types'] ) || ! is_array( $_POST['post_types'] ) ) {
+			return $enabled_types;
+		}
+
+		$requested = array_map( 'sanitize_key', $_POST['post_types'] );
+		$filtered  = array_intersect( $requested, $enabled_types );
+
+		return ! empty( $filtered ) ? array_values( $filtered ) : $enabled_types;
 	}
 }

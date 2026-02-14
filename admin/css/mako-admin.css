@@ -88,6 +88,29 @@
 	margin: 0 4px;
 }
 
+/* Post Type Filter */
+.mako-type-filter {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 4px;
+}
+
+.mako-type-checkbox {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+	font-size: 13px;
+}
+
+/* Action Separators in Table */
+.mako-action-sep {
+	color: #c3c4c7;
+	margin: 0 2px;
+}
+
 /* Progress Bar */
 .mako-progress-container {
 	margin-top: 16px;
