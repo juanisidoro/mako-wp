@@ -73,7 +73,9 @@ final class Mako_Plugin {
 	private function init_hooks(): void {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( $this, 'init_components' ) );
+		add_action( 'init', array( $this, 'handle_well_known' ), 0 );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+		add_filter( 'robots_txt', array( $this, 'filter_robots_txt' ), 10, 2 );
 	}
 
 	public function load_textdomain(): void {
@@ -221,10 +223,13 @@ final class Mako_Plugin {
 		// Compact the content: collapse excessive blank lines.
 		$compact = preg_replace( "/\n{3,}/", "\n\n", trim( $mako_content ) );
 
+		// Prepend spec comments for self-explanation (if enabled).
+		$compact = self::prepend_spec_comments( $compact );
+
 		// Escape </script> if it appears in content (extremely rare in markdown).
 		$safe = str_replace( '</script>', '<\/script>', $compact );
 
-		echo '<script type="text/mako+markdown">' . "\n";
+		echo '<script type="text/mako+markdown" id="mako">' . "\n";
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- MAKO content is markdown, not HTML context.
 		echo $safe . "\n";
 		echo '</script>' . "\n";
@@ -272,5 +277,91 @@ final class Mako_Plugin {
 
 	public function get_storage(): Mako_Storage {
 		return new Mako_Storage();
+	}
+
+	/**
+	 * Handle /.well-known/mako requests.
+	 *
+	 * Serves a JSON document describing the site's MAKO capabilities.
+	 * Runs at init priority 0 to bypass WordPress routing.
+	 */
+	public function handle_well_known(): void {
+		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+		$path        = trim( wp_parse_url( $request_uri, PHP_URL_PATH ), '/' );
+
+		if ( '.well-known/mako' !== $path ) {
+			return;
+		}
+
+		if ( ! get_option( 'mako_well_known', true ) ) {
+			status_header( 404 );
+			exit;
+		}
+
+		$storage = new Mako_Storage();
+		$stats   = $storage->get_stats();
+		$domain  = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		$data = array(
+			'mako'                  => MAKO_SPEC_VERSION,
+			'site'                  => $domain,
+			'total_pages'           => $stats['total'],
+			'content_negotiation'   => (bool) get_option( 'mako_content_negotiation', true ),
+			'html_embedding'        => (bool) get_option( 'mako_html_embedding', true ),
+			'accept'                => 'text/mako+markdown',
+			'sitemap'               => get_option( 'mako_sitemap_enabled', true ) ? '/mako-sitemap.json' : null,
+			'spec'                  => 'https://makospec.vercel.app',
+		);
+
+		// Remove null values.
+		$data = array_filter( $data, fn( $v ) => null !== $v );
+
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Access-Control-Allow-Origin: *' );
+		header( 'Cache-Control: public, max-age=3600' );
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
+		echo wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		exit;
+	}
+
+	/**
+	 * Add MAKO sitemap reference to robots.txt.
+	 */
+	public function filter_robots_txt( string $output, bool $public ): string {
+		if ( ! $public || ! get_option( 'mako_robots_txt', false ) ) {
+			return $output;
+		}
+
+		$sitemap_url = home_url( '/mako-sitemap.json' );
+
+		$output .= "\n# MAKO — AI-Optimized Content\n";
+		$output .= "# Spec: https://makospec.vercel.app\n";
+		$output .= "Sitemap: {$sitemap_url}\n";
+
+		return $output;
+	}
+
+	/**
+	 * Prepend spec comments to MAKO content for self-explanation.
+	 *
+	 * Adds 3 YAML comment lines at the start of the frontmatter that help
+	 * LLMs understand what MAKO is on first encounter. ~30 tokens cost.
+	 */
+	public static function prepend_spec_comments( string $content ): string {
+		if ( ! get_option( 'mako_spec_comments', true ) ) {
+			return $content;
+		}
+
+		$comments = "# @mako — Machine-Accessible Knowledge Object\n"
+			. "# Structured metadata for AI agents and LLMs\n"
+			. "# Spec: https://makospec.vercel.app\n";
+
+		// Insert after the opening --- delimiter.
+		if ( str_starts_with( $content, '---' ) ) {
+			return "---\n" . $comments . substr( $content, 4 );
+		}
+
+		return $comments . $content;
 	}
 }

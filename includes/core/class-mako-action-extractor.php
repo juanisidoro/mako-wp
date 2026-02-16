@@ -12,6 +12,7 @@ class Mako_Action_Extractor {
 	 * Action patterns: regex => [name, description].
 	 */
 	private const PATTERNS = array(
+		// English.
 		'/add\s*to\s*cart/i'                => array( 'add_to_cart', 'Add this product to the shopping cart' ),
 		'/buy\s*now/i'                      => array( 'purchase', 'Buy now' ),
 		'/purchase/i'                       => array( 'purchase', 'Purchase item' ),
@@ -32,6 +33,46 @@ class Mako_Action_Extractor {
 		'/learn\s*more/i'                   => array( 'learn_more', 'Learn more' ),
 		'/view\s*details/i'                => array( 'view_details', 'View details' ),
 		'/request\s*(demo|quote)/i'         => array( 'request_demo', 'Request a demo or quote' ),
+
+		// Spanish.
+		'/a[ñn]adir\s*al?\s*carrito/iu'    => array( 'add_to_cart', 'Add this product to the shopping cart' ),
+		'/comprar(\s+ahora)?/iu'            => array( 'purchase', 'Buy now' ),
+		'/tramitar\s*pedido|finalizar\s*compra/iu' => array( 'checkout', 'Proceed to checkout' ),
+		'/lista\s*de\s*deseos/iu'           => array( 'add_to_wishlist', 'Add to wishlist' ),
+		'/suscrib/iu'                       => array( 'subscribe', 'Subscribe' ),
+		'/reg[ií]str/iu'                    => array( 'sign_up', 'Sign up for an account' ),
+		'/iniciar\s*sesi[oó]n|entrar/iu'   => array( 'login', 'Log in' ),
+		'/descargar/iu'                     => array( 'download', 'Download' ),
+		'/contact[aáe]/iu'                  => array( 'contact', 'Contact' ),
+		'/reservar/iu'                      => array( 'book', 'Book or reserve' ),
+		'/donar/iu'                         => array( 'donate', 'Donate' ),
+		'/compartir/iu'                     => array( 'share', 'Share' ),
+		'/comparar/iu'                      => array( 'compare', 'Compare' ),
+		'/ver\s*disponibilidad/iu'          => array( 'check_availability', 'Check availability' ),
+		'/solicitar/iu'                     => array( 'apply', 'Apply' ),
+		'/m[aá]s\s*informaci[oó]n|saber\s*m[aá]s/iu' => array( 'learn_more', 'Learn more' ),
+		'/ver\s*detalles/iu'               => array( 'view_details', 'View details' ),
+
+		// French.
+		'/ajouter\s*au\s*panier/iu'        => array( 'add_to_cart', 'Add this product to the shopping cart' ),
+		'/acheter(\s+maintenant)?/iu'       => array( 'purchase', 'Buy now' ),
+		'/s.inscrire/iu'                    => array( 'sign_up', 'Sign up for an account' ),
+		'/se\s*connecter/iu'               => array( 'login', 'Log in' ),
+		'/t[eé]l[eé]charger/iu'            => array( 'download', 'Download' ),
+		'/partager/iu'                      => array( 'share', 'Share' ),
+		'/r[eé]server/iu'                   => array( 'book', 'Book or reserve' ),
+
+		// Portuguese.
+		'/adicionar\s*ao\s*carrinho/iu'    => array( 'add_to_cart', 'Add this product to the shopping cart' ),
+		'/comprar\s*agora/iu'              => array( 'purchase', 'Buy now' ),
+		'/baixar/iu'                        => array( 'download', 'Download' ),
+		'/compartilhar/iu'                  => array( 'share', 'Share' ),
+
+		// German.
+		'/in\s*den\s*warenkorb/iu'         => array( 'add_to_cart', 'Add this product to the shopping cart' ),
+		'/jetzt\s*kaufen/iu'               => array( 'purchase', 'Buy now' ),
+		'/herunterladen/iu'                 => array( 'download', 'Download' ),
+		'/teilen/iu'                        => array( 'share', 'Share' ),
 	);
 
 	/**

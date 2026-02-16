@@ -137,10 +137,32 @@ class Mako_Admin_Settings {
 			'mako_headers',
 			__( 'Embed MAKO content in HTML &lt;head&gt; via &lt;script type="text/mako+markdown"&gt;. Allows LLMs to extract MAKO content while parsing HTML, without content negotiation. Recommended.', 'mako-wp' )
 		);
+		$this->add_checkbox(
+			'mako_well_known',
+			__( 'Enable /.well-known/mako', 'mako-wp' ),
+			'mako_headers',
+			__( 'Serve a JSON discovery document at /.well-known/mako describing your site\'s MAKO capabilities. Helps AI agents discover MAKO support automatically.', 'mako-wp' )
+		);
+		$this->add_checkbox(
+			'mako_spec_comments',
+			__( 'Spec Comments in Embedding', 'mako-wp' ),
+			'mako_headers',
+			__( 'Prepend 3 YAML comment lines to embedded MAKO content explaining what MAKO is. Helps LLMs understand the format on first encounter (~30 extra tokens).', 'mako-wp' )
+		);
+		$this->add_checkbox(
+			'mako_robots_txt',
+			__( 'Add to robots.txt', 'mako-wp' ),
+			'mako_headers',
+			__( 'Add a reference to the MAKO sitemap in your robots.txt file so crawlers can discover MAKO content.', 'mako-wp' ),
+			false
+		);
 		register_setting( 'mako_settings', 'mako_content_negotiation', array( 'type' => 'boolean', 'default' => true ) );
 		register_setting( 'mako_settings', 'mako_alternate_link', array( 'type' => 'boolean', 'default' => true ) );
 		register_setting( 'mako_settings', 'mako_sitemap_enabled', array( 'type' => 'boolean', 'default' => true ) );
 		register_setting( 'mako_settings', 'mako_html_embedding', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_well_known', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_spec_comments', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_robots_txt', array( 'type' => 'boolean', 'default' => false ) );
 
 		add_settings_field(
 			'mako_cache_control',
@@ -413,12 +435,12 @@ class Mako_Admin_Settings {
 		echo '</select>';
 	}
 
-	private function add_checkbox( string $name, string $label, string $section, string $description = '' ): void {
+	private function add_checkbox( string $name, string $label, string $section, string $description = '', bool $default = true ): void {
 		add_settings_field(
 			$name,
 			$label,
-			function () use ( $name, $description ) {
-				$value = get_option( $name, true );
+			function () use ( $name, $description, $default ) {
+				$value = get_option( $name, $default );
 				printf(
 					'<input type="checkbox" name="%s" value="1" %s>',
 					esc_attr( $name ),

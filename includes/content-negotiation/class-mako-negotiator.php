@@ -104,6 +104,9 @@ class Mako_Negotiator {
 			$this->cache->set( $post_id, $data );
 		}
 
+		// Prepend spec comments for self-explanation.
+		$data['content'] = Mako_Plugin::prepend_spec_comments( $data['content'] );
+
 		$response = new Mako_Response();
 
 		// Handle ETag / conditional requests.
