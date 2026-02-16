@@ -1,10 +1,10 @@
 === MAKO - AI-Optimized Content ===
 Contributors: makoprotocol
-Tags: ai, llm, markdown, content-negotiation, seo, mako
+Tags: ai, llm, markdown, content-negotiation, seo, mako, woocommerce, agents, chatgpt
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.7.0
 License: Apache-2.0
 License URI: https://www.apache.org/licenses/LICENSE-2.0
 
@@ -27,17 +27,23 @@ When an AI agent sends `Accept: text/mako+markdown`, your WordPress site respond
 
 * **Automatic MAKO generation** for posts, pages, and WooCommerce products
 * **Content negotiation** - serves MAKO when AI agents request it, HTML otherwise
-* **Full MAKO spec compliance** - frontmatter, semantic links, actions, proper HTTP headers
-* **WooCommerce integration** - product data, pricing, stock status, add-to-cart actions
+* **Full MAKO spec compliance** - frontmatter, semantic links, actions, media, proper HTTP headers
+* **AI BYOK (Bring Your Own Key)** - optional AI-enhanced generation using OpenAI, Anthropic, or Google API keys
+* **WooCommerce integration** - product data, pricing, stock status, variations, reviews, add-to-cart actions
 * **SEO plugin integration** - uses Yoast SEO and Rank Math data for richer metadata
 * **ACF support** - includes Advanced Custom Fields data in MAKO output
+* **WPML/Polylang** - multilingual support with language detection
+* **HTML embedding** - `<script type="text/mako+markdown">` in `<head>` for inline discovery
+* **Media support** - cover image from featured image, image count in frontmatter
 * **MAKO Sitemap** at `/.well-known/mako.json` for agent discovery
 * **REST API** for programmatic access and integration
-* **Admin dashboard** with token savings statistics
-* **Post editor meta box** with MAKO preview and regeneration
-* **Bulk generation** for existing content
+* **Admin dashboard** with pagination, post type filters, token savings statistics
+* **Post editor meta box** with editable type, entity, summary fields and MAKO preview
+* **Bulk operations** - select, delete, regenerate with batch sizes (+10/+20/+50/All)
 * **Caching with ETags** for optimal performance
 * **`<link rel="alternate">` injection** for MAKO discoverability
+* **Multilingual actions** - ~50 CTA patterns across EN/ES/FR/PT/DE
+* **10+ settings** - content negotiation, HTML embedding, auto-generate, AI provider, and more
 
 = Supported Content Types =
 
@@ -112,15 +118,25 @@ Yes. The plugin provides extensive WordPress filters:
 
 == Changelog ==
 
+= 1.7.0 =
+* AI BYOK: generate MAKO content using your own OpenAI, Anthropic, or Google API key
+* Dashboard: pagination, post type filter, bulk select/delete/regenerate, batch sizes (+10/+20/+50/All)
+* Meta box: editable type, entity, summary fields in post sidebar
+* Media: cover image from featured image, image count in frontmatter
+* HTML embedding: `<script type="text/mako+markdown">` in `<head>`
+* Discovery: `/.well-known/mako` endpoint, spec comments in frontmatter
+* Multilingual actions: ~50 CTA patterns across EN/ES/FR/PT/DE
+* 10+ configuration options
+
 = 1.0.0 =
 * Initial release
 * MAKO spec v1.0 compliance
 * Content negotiation handler
-* HTML to Markdown converter
+* HTML to Markdown converter (10-step pipeline)
 * Content type auto-detection
 * Semantic link extraction
 * Action/CTA detection
-* WooCommerce product integration
+* WooCommerce product integration (pricing, stock, variations, reviews)
 * Yoast SEO and Rank Math integration
 * ACF custom fields support
 * REST API endpoints
@@ -132,6 +148,9 @@ Yes. The plugin provides extensive WordPress filters:
 * WPML/Polylang language support
 
 == Upgrade Notice ==
+
+= 1.7.0 =
+Major update: AI-powered generation (BYOK), improved dashboard with bulk operations, media support, HTML embedding, multilingual actions.
 
 = 1.0.0 =
 Initial release. Install to start serving AI-optimized content from your WordPress site.
