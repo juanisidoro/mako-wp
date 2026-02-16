@@ -17,6 +17,10 @@ $meta_keys = array(
 	'_mako_updated_at',
 	'_mako_content_hash',
 	'_mako_enabled',
+	'_mako_custom_content',
+	'_mako_custom_type',
+	'_mako_custom_entity',
+	'_mako_custom_cover',
 );
 
 foreach ( $meta_keys as $key ) {
@@ -37,7 +41,11 @@ $options = array(
 	'mako_content_negotiation',
 	'mako_alternate_link',
 	'mako_sitemap_enabled',
+	'mako_html_embedding',
 	'mako_cache_control',
+	'mako_ai_provider',
+	'mako_ai_api_key',
+	'mako_ai_model',
 	'mako_version',
 	'mako_stats_total',
 	'mako_stats_avg_savings',

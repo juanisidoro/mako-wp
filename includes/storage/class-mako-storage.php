@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Mako_Storage {
 
+	// Auto-generated data.
 	const META_CONTENT     = '_mako_content';
 	const META_HEADERS     = '_mako_headers';
 	const META_TOKENS      = '_mako_tokens';
@@ -15,6 +16,12 @@ class Mako_Storage {
 	const META_UPDATED     = '_mako_updated_at';
 	const META_HASH        = '_mako_content_hash';
 	const META_ENABLED     = '_mako_enabled';
+
+	// User custom overrides (take precedence over auto-generated).
+	const META_CUSTOM_CONTENT = '_mako_custom_content';
+	const META_CUSTOM_TYPE    = '_mako_custom_type';
+	const META_CUSTOM_ENTITY  = '_mako_custom_entity';
+	const META_CUSTOM_COVER   = '_mako_custom_cover';
 
 	/**
 	 * Save generated MAKO data for a post.
@@ -62,6 +69,68 @@ class Mako_Storage {
 	}
 
 	/**
+	 * Get the effective MAKO content: custom override if exists, otherwise auto-generated.
+	 */
+	public function get_effective_content( int $post_id ): ?string {
+		$custom = get_post_meta( $post_id, self::META_CUSTOM_CONTENT, true );
+		if ( '' !== $custom ) {
+			return $custom;
+		}
+
+		return get_post_meta( $post_id, self::META_CONTENT, true ) ?: null;
+	}
+
+	/**
+	 * Check if a post has custom (user-edited) MAKO content.
+	 */
+	public function has_custom_content( int $post_id ): bool {
+		return '' !== get_post_meta( $post_id, self::META_CUSTOM_CONTENT, true );
+	}
+
+	/**
+	 * Save custom overrides from the meta box editor.
+	 */
+	public function save_custom( int $post_id, array $overrides ): void {
+		if ( isset( $overrides['content'] ) && '' !== trim( $overrides['content'] ) ) {
+			update_post_meta( $post_id, self::META_CUSTOM_CONTENT, $overrides['content'] );
+		} else {
+			delete_post_meta( $post_id, self::META_CUSTOM_CONTENT );
+		}
+
+		if ( isset( $overrides['type'] ) && '' !== trim( $overrides['type'] ) ) {
+			update_post_meta( $post_id, self::META_CUSTOM_TYPE, sanitize_text_field( $overrides['type'] ) );
+		} else {
+			delete_post_meta( $post_id, self::META_CUSTOM_TYPE );
+		}
+
+		if ( isset( $overrides['entity'] ) && '' !== trim( $overrides['entity'] ) ) {
+			update_post_meta( $post_id, self::META_CUSTOM_ENTITY, sanitize_text_field( $overrides['entity'] ) );
+		} else {
+			delete_post_meta( $post_id, self::META_CUSTOM_ENTITY );
+		}
+
+		if ( isset( $overrides['cover'] ) && '' !== trim( $overrides['cover'] ) ) {
+			update_post_meta( $post_id, self::META_CUSTOM_COVER, absint( $overrides['cover'] ) );
+		} else {
+			delete_post_meta( $post_id, self::META_CUSTOM_COVER );
+		}
+
+		delete_transient( 'mako_global_stats' );
+	}
+
+	/**
+	 * Get custom overrides for a post.
+	 */
+	public function get_custom( int $post_id ): array {
+		return array(
+			'content' => get_post_meta( $post_id, self::META_CUSTOM_CONTENT, true ),
+			'type'    => get_post_meta( $post_id, self::META_CUSTOM_TYPE, true ),
+			'entity'  => get_post_meta( $post_id, self::META_CUSTOM_ENTITY, true ),
+			'cover'   => get_post_meta( $post_id, self::META_CUSTOM_COVER, true ),
+		);
+	}
+
+	/**
 	 * Delete MAKO data for a post.
 	 */
 	public function delete( int $post_id ): void {
@@ -69,6 +138,8 @@ class Mako_Storage {
 			self::META_CONTENT, self::META_HEADERS, self::META_TOKENS,
 			self::META_HTML_TOKENS, self::META_SAVINGS, self::META_TYPE,
 			self::META_UPDATED, self::META_HASH,
+			self::META_CUSTOM_CONTENT, self::META_CUSTOM_TYPE,
+			self::META_CUSTOM_ENTITY, self::META_CUSTOM_COVER,
 		);
 
 		foreach ( $keys as $key ) {

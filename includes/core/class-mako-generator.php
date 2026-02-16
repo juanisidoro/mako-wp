@@ -21,6 +21,22 @@ class Mako_Generator {
 	private Mako_Validator $validator;
 
 	/**
+	 * Known AI bot user-agent strings.
+	 */
+	private const AI_BOTS = array(
+		'GPTBot',
+		'ClaudeBot',
+		'PerplexityBot',
+		'Google-Extended',
+		'Bytespider',
+		'CCBot',
+		'ChatGPT-User',
+		'anthropic-ai',
+		'Applebot-Extended',
+		'cohere-ai',
+	);
+
+	/**
 	 * Section templates per content type.
 	 */
 	private const SECTION_MAP = array(
@@ -102,6 +118,9 @@ class Mako_Generator {
 			$mako_tokens = $this->token_counter->count( $body );
 		}
 
+		// Step 11: Extract media metadata (cover + counts).
+		$media = $this->extract_media( $post, $html, $type );
+
 		// Build summary.
 		$summary = $this->derive_summary( $post, $markdown );
 
@@ -126,6 +145,7 @@ class Mako_Generator {
 			'tokens'    => $mako_tokens,
 			'language'  => $language,
 			'summary'   => $summary,
+			'media'     => $media,
 			'freshness' => $freshness,
 			'canonical' => $canonical,
 			'tags'      => $tags,
@@ -439,6 +459,118 @@ class Mako_Generator {
 		}
 
 		return array_unique( array_slice( $tags, 0, 10 ) );
+	}
+
+	/**
+	 * Extract media metadata: cover image + content counts.
+	 *
+	 * @return array{cover?: array{url: string, alt: string}, images: int, video: int, audio: int, interactive: int}
+	 */
+	private function extract_media( WP_Post $post, string $html, string $type ): array {
+		$media = array();
+
+		// Extract cover image based on content type.
+		$cover = $this->extract_cover( $post, $type );
+		if ( $cover ) {
+			$media['cover'] = $cover;
+		}
+
+		// Count media elements from HTML.
+		if ( '' !== trim( $html ) ) {
+			$media['images']      = $this->count_html_elements( $html, '<img' );
+			$media['video']       = $this->count_html_elements( $html, '<video' )
+									+ $this->count_html_elements( $html, '<iframe' );
+			$media['audio']       = $this->count_html_elements( $html, '<audio' );
+			$media['interactive'] = $this->count_html_elements( $html, '<canvas' )
+									+ $this->count_html_elements( $html, '<form' );
+		}
+
+		// Remove zero counts.
+		foreach ( array( 'images', 'video', 'audio', 'interactive' ) as $key ) {
+			if ( isset( $media[ $key ] ) && 0 === $media[ $key ] ) {
+				unset( $media[ $key ] );
+			}
+		}
+
+		return $media;
+	}
+
+	/**
+	 * Extract the cover image for a post based on its content type.
+	 *
+	 * @return array{url: string, alt: string}|null
+	 */
+	private function extract_cover( WP_Post $post, string $type ): ?array {
+		$image_id = null;
+
+		// WooCommerce product: use product featured image.
+		if ( 'product' === $type && function_exists( 'wc_get_product' ) ) {
+			$product = wc_get_product( $post->ID );
+			if ( $product ) {
+				$image_id = $product->get_image_id();
+			}
+		}
+
+		// Fallback to WordPress featured image (post thumbnail).
+		if ( ! $image_id ) {
+			$image_id = get_post_thumbnail_id( $post->ID );
+		}
+
+		// For listings (taxonomy archives), try category thumbnail.
+		if ( ! $image_id && 'listing' === $type ) {
+			$terms = get_the_terms( $post->ID, 'product_cat' );
+			if ( $terms && ! is_wp_error( $terms ) ) {
+				$term_id  = $terms[0]->term_id;
+				$image_id = get_term_meta( $term_id, 'thumbnail_id', true );
+			}
+		}
+
+		if ( ! $image_id ) {
+			return null;
+		}
+
+		$url = wp_get_attachment_url( (int) $image_id );
+		if ( ! $url ) {
+			return null;
+		}
+
+		$alt = get_post_meta( (int) $image_id, '_wp_attachment_image_alt', true );
+		if ( empty( $alt ) ) {
+			$alt = $post->post_title;
+		}
+
+		return array(
+			'url' => $url,
+			'alt' => $alt,
+		);
+	}
+
+	/**
+	 * Count occurrences of an HTML tag in content.
+	 */
+	private function count_html_elements( string $html, string $tag ): int {
+		return substr_count( strtolower( $html ), strtolower( $tag ) );
+	}
+
+	/**
+	 * Check if the current request is from a known AI bot.
+	 */
+	public static function is_ai_bot(): bool {
+		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) )
+			: '';
+
+		if ( '' === $user_agent ) {
+			return false;
+		}
+
+		foreach ( self::AI_BOTS as $bot ) {
+			if ( str_contains( $user_agent, $bot ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

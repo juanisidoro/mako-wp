@@ -23,6 +23,7 @@ class Mako_Admin {
 		add_action( 'wp_ajax_mako_delete', array( $this, 'ajax_delete' ) );
 		add_action( 'wp_ajax_mako_flush_cache', array( $this, 'ajax_flush_cache' ) );
 		add_action( 'wp_ajax_mako_get_queue', array( $this, 'ajax_get_queue' ) );
+		add_action( 'wp_ajax_mako_ai_generate', array( $this, 'ajax_ai_generate' ) );
 	}
 
 	public function enqueue_assets( string $hook ): void {
@@ -30,6 +31,11 @@ class Mako_Admin {
 
 		if ( ! in_array( $hook, $screens, true ) ) {
 			return;
+		}
+
+		// Media library for cover image selector on post screens.
+		if ( in_array( $hook, array( 'post.php', 'post-new.php' ), true ) ) {
+			wp_enqueue_media();
 		}
 
 		wp_enqueue_style(
@@ -74,6 +80,9 @@ class Mako_Admin {
 				'noTypesSelected' => __( 'Select at least one post type.', 'mako-wp' ),
 				'copy'            => __( 'Copy', 'mako-wp' ),
 				'copied'          => __( 'Copied!', 'mako-wp' ),
+				'aiGenerating'    => __( 'AI is generating...', 'mako-wp' ),
+				'aiDone'          => __( 'AI generation complete. Review the content below.', 'mako-wp' ),
+				'aiError'         => __( 'AI generation failed', 'mako-wp' ),
 			),
 		) );
 	}
@@ -324,6 +333,40 @@ class Mako_Admin {
 		wp_send_json_success( array(
 			'content' => $data['content'],
 			'headers' => $data['headers'],
+		) );
+	}
+
+	/**
+	 * AJAX: Generate MAKO content using AI (BYOK).
+	 */
+	public function ajax_ai_generate(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$post_id = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
+		if ( ! $post_id ) {
+			wp_send_json_error( 'Invalid post ID' );
+		}
+
+		// Get current auto-generated MAKO as base.
+		$storage      = new Mako_Storage();
+		$current_data = $storage->get( $post_id );
+		$current_mako = $current_data['content'] ?? '';
+
+		$ai = new Mako_AI_Generator();
+		$result = $ai->generate( $post_id, $current_mako );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( $result->get_error_message() );
+		}
+
+		wp_send_json_success( array(
+			'content'  => $result['content'],
+			'model'    => $result['model'],
+			'provider' => $result['provider'],
 		) );
 	}
 

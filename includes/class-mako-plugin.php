@@ -38,6 +38,7 @@ final class Mako_Plugin {
 		require_once $dir . 'core/class-mako-headers.php';
 		require_once $dir . 'core/class-mako-validator.php';
 		require_once $dir . 'core/class-mako-generator.php';
+		require_once $dir . 'core/class-mako-ai-generator.php';
 		require_once $dir . 'core/class-mako-cron.php';
 
 		// Storage.
@@ -98,6 +99,11 @@ final class Mako_Plugin {
 		// Alternate link in HTML head.
 		if ( get_option( 'mako_alternate_link', true ) ) {
 			add_action( 'wp_head', array( $this, 'render_alternate_link' ) );
+		}
+
+		// HTML embedding: output MAKO content in <script> tag.
+		if ( get_option( 'mako_html_embedding', true ) ) {
+			add_action( 'wp_head', array( $this, 'render_mako_embedding' ), 20 );
 		}
 
 		// Integrations.
@@ -174,6 +180,54 @@ final class Mako_Plugin {
 			'<link rel="alternate" type="text/mako+markdown" href="%s" />' . "\n",
 			esc_url( $permalink )
 		);
+	}
+
+	/**
+	 * Render MAKO content embedded in HTML via <script type="text/mako+markdown">.
+	 *
+	 * Follows the JSON-LD pattern: agents parsing HTML can extract MAKO content
+	 * without content negotiation. Output is compact to minimize HTML bloat.
+	 */
+	public function render_mako_embedding(): void {
+		if ( ! is_singular() ) {
+			return;
+		}
+
+		$post_id = get_queried_object_id();
+		if ( ! $post_id ) {
+			return;
+		}
+
+		$enabled_types = self::get_enabled_post_types();
+		$post_type     = get_post_type( $post_id );
+
+		if ( ! in_array( $post_type, $enabled_types, true ) ) {
+			return;
+		}
+
+		$storage = new Mako_Storage();
+
+		if ( ! $storage->is_enabled_for_post( $post_id ) ) {
+			return;
+		}
+
+		// Get effective content (custom override or auto-generated).
+		$mako_content = $storage->get_effective_content( $post_id );
+
+		if ( ! $mako_content ) {
+			return;
+		}
+
+		// Compact the content: collapse excessive blank lines.
+		$compact = preg_replace( "/\n{3,}/", "\n\n", trim( $mako_content ) );
+
+		// Escape </script> if it appears in content (extremely rare in markdown).
+		$safe = str_replace( '</script>', '<\/script>', $compact );
+
+		echo '<script type="text/mako+markdown">' . "\n";
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- MAKO content is markdown, not HTML context.
+		echo $safe . "\n";
+		echo '</script>' . "\n";
 	}
 
 	public function register_rest_routes(): void {

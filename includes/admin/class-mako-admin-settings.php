@@ -131,9 +131,16 @@ class Mako_Admin_Settings {
 			'mako_headers',
 			__( 'Publish a JSON sitemap listing all pages with MAKO content, accessible at /mako-sitemap.json.', 'mako-wp' )
 		);
+		$this->add_checkbox(
+			'mako_html_embedding',
+			__( 'HTML Embedding', 'mako-wp' ),
+			'mako_headers',
+			__( 'Embed MAKO content in HTML &lt;head&gt; via &lt;script type="text/mako+markdown"&gt;. Allows LLMs to extract MAKO content while parsing HTML, without content negotiation. Recommended.', 'mako-wp' )
+		);
 		register_setting( 'mako_settings', 'mako_content_negotiation', array( 'type' => 'boolean', 'default' => true ) );
 		register_setting( 'mako_settings', 'mako_alternate_link', array( 'type' => 'boolean', 'default' => true ) );
 		register_setting( 'mako_settings', 'mako_sitemap_enabled', array( 'type' => 'boolean', 'default' => true ) );
+		register_setting( 'mako_settings', 'mako_html_embedding', array( 'type' => 'boolean', 'default' => true ) );
 
 		add_settings_field(
 			'mako_cache_control',
@@ -165,6 +172,44 @@ class Mako_Admin_Settings {
 			)
 		);
 		register_setting( 'mako_settings', 'mako_cache_ttl', array( 'type' => 'integer', 'default' => 3600 ) );
+
+		// AI Enhancement section.
+		add_settings_section( 'mako_ai', __( 'AI Enhancement (BYOK)', 'mako-wp' ), function () {
+			echo '<p class="description">';
+			echo esc_html__( 'Add your API key to enable AI-enhanced MAKO generation. The AI uses your page content and the MAKO spec to generate optimized files.', 'mako-wp' );
+			echo '</p>';
+		}, 'mako-settings' );
+
+		add_settings_field(
+			'mako_ai_provider',
+			__( 'AI Provider', 'mako-wp' ),
+			array( $this, 'render_ai_provider_field' ),
+			'mako-settings',
+			'mako_ai'
+		);
+		register_setting( 'mako_settings', 'mako_ai_provider', array( 'type' => 'string', 'default' => '' ) );
+
+		add_settings_field(
+			'mako_ai_api_key',
+			__( 'API Key', 'mako-wp' ),
+			array( $this, 'render_ai_key_field' ),
+			'mako-settings',
+			'mako_ai'
+		);
+		register_setting( 'mako_settings', 'mako_ai_api_key', array(
+			'type'              => 'string',
+			'default'           => '',
+			'sanitize_callback' => 'sanitize_text_field',
+		) );
+
+		add_settings_field(
+			'mako_ai_model',
+			__( 'Model', 'mako-wp' ),
+			array( $this, 'render_ai_model_field' ),
+			'mako-settings',
+			'mako_ai'
+		);
+		register_setting( 'mako_settings', 'mako_ai_model', array( 'type' => 'string', 'default' => '' ) );
 	}
 
 	public function render_settings(): void {
@@ -317,6 +362,55 @@ class Mako_Admin_Settings {
 			. '</svg>';
 
 		return 'data:image/svg+xml;base64,' . base64_encode( $svg );
+	}
+
+	public function render_ai_provider_field(): void {
+		$current   = get_option( 'mako_ai_provider', '' );
+		$providers = Mako_AI_Generator::get_providers();
+
+		echo '<select name="mako_ai_provider" id="mako_ai_provider">';
+		printf( '<option value="">%s</option>', esc_html__( '— Not configured —', 'mako-wp' ) );
+		foreach ( $providers as $key => $info ) {
+			printf(
+				'<option value="%s" %s>%s</option>',
+				esc_attr( $key ),
+				selected( $current, $key, false ),
+				esc_html( $info['label'] )
+			);
+		}
+		echo '</select>';
+	}
+
+	public function render_ai_key_field(): void {
+		$value = get_option( 'mako_ai_api_key', '' );
+		printf(
+			'<input type="password" name="mako_ai_api_key" value="%s" class="regular-text" autocomplete="off">',
+			esc_attr( $value )
+		);
+		echo '<p class="description">';
+		echo esc_html__( 'Your API key is stored in the WordPress database. Use a key with minimal permissions.', 'mako-wp' );
+		echo '</p>';
+	}
+
+	public function render_ai_model_field(): void {
+		$current   = get_option( 'mako_ai_model', '' );
+		$providers = Mako_AI_Generator::get_providers();
+
+		echo '<select name="mako_ai_model" id="mako_ai_model">';
+		printf( '<option value="">%s</option>', esc_html__( '— Default for provider —', 'mako-wp' ) );
+		foreach ( $providers as $provider_key => $info ) {
+			foreach ( $info['models'] as $model ) {
+				printf(
+					'<option value="%s" data-provider="%s" %s>%s — %s</option>',
+					esc_attr( $model ),
+					esc_attr( $provider_key ),
+					selected( $current, $model, false ),
+					esc_html( $info['label'] ),
+					esc_html( $model )
+				);
+			}
+		}
+		echo '</select>';
 	}
 
 	private function add_checkbox( string $name, string $label, string $section, string $description = '' ): void {

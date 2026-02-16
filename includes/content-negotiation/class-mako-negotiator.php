@@ -35,7 +35,10 @@ class Mako_Negotiator {
 	}
 
 	/**
-	 * Handle incoming request - check for MAKO Accept header.
+	 * Handle incoming request - only respond to explicit MAKO Accept header.
+	 *
+	 * AI bots receive MAKO via HTML embedding (<script> in <head>),
+	 * not via content negotiation replacement.
 	 */
 	public function handle_request(): void {
 		if ( ! $this->accepts_mako() ) {
@@ -89,6 +92,12 @@ class Mako_Negotiator {
 
 				$this->storage->save( $post_id, $result );
 				$data = $result;
+			}
+
+			// Apply custom overrides if they exist.
+			$effective = $this->storage->get_effective_content( $post_id );
+			if ( $effective && $effective !== $data['content'] ) {
+				$data['content'] = $effective;
 			}
 
 			// Cache for next request.

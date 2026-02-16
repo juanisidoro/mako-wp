@@ -37,6 +37,23 @@ class Mako_Frontmatter {
 			$yaml .= 'canonical: ' . $this->yaml_string( $data['canonical'] ) . "\n";
 		}
 
+		if ( ! empty( $data['media'] ) && is_array( $data['media'] ) ) {
+			$yaml .= "media:\n";
+			$media = $data['media'];
+
+			if ( ! empty( $media['cover'] ) && is_array( $media['cover'] ) ) {
+				$yaml .= "  cover:\n";
+				$yaml .= '    url: ' . $this->yaml_string( $media['cover']['url'] ) . "\n";
+				$yaml .= '    alt: ' . $this->yaml_string( $media['cover']['alt'] ) . "\n";
+			}
+
+			foreach ( array( 'images', 'video', 'audio', 'interactive', 'downloads' ) as $count_key ) {
+				if ( ! empty( $media[ $count_key ] ) ) {
+					$yaml .= '  ' . $count_key . ': ' . (int) $media[ $count_key ] . "\n";
+				}
+			}
+		}
+
 		if ( ! empty( $data['tags'] ) && is_array( $data['tags'] ) ) {
 			$yaml .= "tags:\n";
 			foreach ( $data['tags'] as $tag ) {

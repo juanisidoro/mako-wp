@@ -238,12 +238,6 @@
 	width: 40%;
 }
 
-.mako-meta-actions {
-	display: flex;
-	gap: 8px;
-	margin-top: 12px;
-}
-
 /* Preview Modal */
 .mako-modal {
 	position: fixed;
@@ -327,6 +321,135 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 	margin: 0;
+}
+
+/* Meta Box: Editable Table */
+.mako-meta-table--edit td {
+	padding: 6px 0;
+	vertical-align: top;
+}
+
+.mako-meta-table--edit td:first-child {
+	width: 70px;
+	padding-top: 10px;
+	font-weight: 500;
+	color: #1d2327;
+}
+
+.mako-meta-table--edit select,
+.mako-meta-table--edit input[type="text"] {
+	width: 100%;
+	max-width: 100%;
+}
+
+/* Meta Box: Editor Section */
+.mako-editor-section {
+	margin: 12px 0 8px;
+}
+
+.mako-editor-header {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.mako-editor-hint {
+	font-size: 12px;
+	color: #646970;
+	font-style: italic;
+}
+
+.mako-content-editor {
+	width: 100%;
+	min-height: 280px;
+	font-family: Consolas, Monaco, "Courier New", monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	tab-size: 2;
+	background: #1e293b;
+	color: #e2e8f0;
+	border: 1px solid #334155;
+	border-radius: 4px;
+	padding: 12px;
+	resize: vertical;
+}
+
+.mako-content-editor:focus {
+	outline: none;
+	border-color: #10b981;
+	box-shadow: 0 0 0 1px #10b981;
+}
+
+.mako-content-editor::placeholder {
+	color: #64748b;
+}
+
+/* Meta Box: Metrics Bar */
+.mako-meta-metrics {
+	display: flex;
+	gap: 16px;
+	padding: 10px 0;
+	margin: 4px 0;
+	border-top: 1px solid #f0f0f1;
+	border-bottom: 1px solid #f0f0f1;
+	font-size: 13px;
+	color: #1d2327;
+}
+
+.mako-meta-metrics > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.mako-meta-metrics .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	color: #10b981;
+}
+
+/* Meta Box: Cover Field */
+.mako-cover-field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.mako-cover-preview {
+	width: 60px;
+	height: 60px;
+	object-fit: cover;
+	border-radius: 4px;
+	border: 1px solid #c3c4c7;
+}
+
+/* Meta Box: Action Buttons with Dashicons */
+.mako-meta-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+	flex-wrap: wrap;
+}
+
+.mako-meta-actions .button .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	vertical-align: text-bottom;
+	margin-right: 2px;
+}
+
+.mako-btn-ai-enhance {
+	background: #f0fdf4 !important;
+	border-color: #86efac !important;
+	color: #166534 !important;
+}
+
+.mako-btn-ai-enhance:hover {
+	background: #dcfce7 !important;
+	border-color: #4ade80 !important;
 }
 
 /* Spinner */

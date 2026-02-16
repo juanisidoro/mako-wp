@@ -68,7 +68,7 @@
 	// --- Single post generation (from meta box) ---
 
 	function generateMako(postId, $button) {
-		var originalText = $button.text();
+		var originalText = $button.html();
 		$button.prop('disabled', true).html('<span class="mako-spinner"></span>' + config.i18n.generating);
 
 		$.post(config.ajaxUrl, {
@@ -78,23 +78,116 @@
 		})
 		.done(function (response) {
 			if (response.success) {
-				$button.text(config.i18n.generated).addClass('button-primary');
-				setTimeout(function () {
-					window.location.reload();
-				}, 500);
+				$button.html(originalText);
+				// If the editor textarea exists, fetch preview and populate it.
+				var $editor = $('#mako_custom_content');
+				if ($editor.length) {
+					$.post(config.ajaxUrl, {
+						action: 'mako_preview',
+						nonce: config.nonce,
+						post_id: postId
+					}).done(function (prev) {
+						if (prev.success && prev.data.content) {
+							$editor.val(prev.data.content);
+						}
+					});
+					// Update metrics inline.
+					$('.mako-meta-metrics').show();
+				} else {
+					setTimeout(function () {
+						window.location.reload();
+					}, 500);
+				}
 			} else {
-				$button.text(config.i18n.error);
+				$button.html('<span class="dashicons dashicons-warning"></span> ' + config.i18n.error);
 				alert(response.data || 'Generation failed');
 			}
 		})
 		.fail(function () {
-			$button.text(config.i18n.error);
+			$button.html('<span class="dashicons dashicons-warning"></span> ' + config.i18n.error);
 		})
 		.always(function () {
 			setTimeout(function () {
-				$button.prop('disabled', false).text(originalText);
+				$button.prop('disabled', false).html(originalText);
 			}, 2000);
 		});
+	}
+
+	// --- AI Enhance (BYOK) ---
+
+	function aiEnhance(postId, $button) {
+		var originalHtml = $button.html();
+		$button.prop('disabled', true).html('<span class="mako-spinner"></span>' + config.i18n.aiGenerating);
+
+		$.post(config.ajaxUrl, {
+			action: 'mako_ai_generate',
+			nonce: config.nonce,
+			post_id: postId
+		})
+		.done(function (response) {
+			if (response.success) {
+				$('#mako_custom_content').val(response.data.content);
+				$button.html(originalHtml);
+			} else {
+				alert((config.i18n.aiError || 'AI generation failed') + ': ' + (response.data || ''));
+				$button.html(originalHtml);
+			}
+		})
+		.fail(function () {
+			alert(config.i18n.aiError || 'AI generation failed');
+			$button.html(originalHtml);
+		})
+		.always(function () {
+			$button.prop('disabled', false);
+		});
+	}
+
+	// --- Cover Image Selector ---
+
+	var coverFrame = null;
+
+	function openCoverSelector() {
+		if (coverFrame) {
+			coverFrame.open();
+			return;
+		}
+
+		coverFrame = wp.media({
+			title: 'Select Cover Image',
+			button: { text: 'Use as Cover' },
+			multiple: false,
+			library: { type: 'image' }
+		});
+
+		coverFrame.on('select', function () {
+			var attachment = coverFrame.state().get('selection').first().toJSON();
+			$('#mako_custom_cover').val(attachment.id);
+
+			var imgUrl = attachment.sizes && attachment.sizes.thumbnail
+				? attachment.sizes.thumbnail.url
+				: attachment.url;
+
+			var $field = $('.mako-cover-field');
+			$field.find('.mako-cover-preview').remove();
+			$field.prepend('<img src="' + imgUrl + '" class="mako-cover-preview" alt="">');
+
+			// Show remove button if not present.
+			if (!$field.find('.mako-btn-cover-remove').length) {
+				$field.find('.mako-btn-cover-select').after(
+					' <button type="button" class="button mako-btn-cover-remove">Remove</button>'
+				);
+			}
+			$field.find('.mako-btn-cover-select').text('Change');
+		});
+
+		coverFrame.open();
+	}
+
+	function removeCover() {
+		$('#mako_custom_cover').val('');
+		$('.mako-cover-preview').remove();
+		$('.mako-btn-cover-remove').remove();
+		$('.mako-btn-cover-select').text('Select Image');
 	}
 
 	// --- Preview ---
@@ -346,6 +439,24 @@
 		$(document).on('click', '.mako-btn-generate, .mako-btn-regenerate', function (e) {
 			e.preventDefault();
 			generateMako($(this).data('post-id'), $(this));
+		});
+
+		// AI Enhance.
+		$(document).on('click', '.mako-btn-ai-enhance', function (e) {
+			e.preventDefault();
+			aiEnhance($(this).data('post-id'), $(this));
+		});
+
+		// Cover image selector.
+		$(document).on('click', '.mako-btn-cover-select', function (e) {
+			e.preventDefault();
+			openCoverSelector();
+		});
+
+		// Cover image remove.
+		$(document).on('click', '.mako-btn-cover-remove', function (e) {
+			e.preventDefault();
+			removeCover();
 		});
 
 		// Preview.
