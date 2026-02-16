@@ -45,11 +45,7 @@ class Mako_Negotiator {
 			return;
 		}
 
-		if ( ! is_singular() ) {
-			return;
-		}
-
-		$post_id = get_queried_object_id();
+		$post_id = Mako_Plugin::get_current_mako_post_id();
 		if ( ! $post_id ) {
 			return;
 		}
@@ -155,13 +151,11 @@ class Mako_Negotiator {
 	 * Set Vary: Accept header on singular pages.
 	 */
 	public function set_vary_header(): void {
-		if ( is_singular() ) {
-			$post_id = get_queried_object_id();
-			if ( $post_id ) {
-				$enabled_types = Mako_Plugin::get_enabled_post_types();
-				if ( in_array( get_post_type( $post_id ), $enabled_types, true ) ) {
-					header( 'Vary: Accept', false ); // Append, don't replace.
-				}
+		$post_id = Mako_Plugin::get_current_mako_post_id();
+		if ( $post_id ) {
+			$enabled_types = Mako_Plugin::get_enabled_post_types();
+			if ( in_array( get_post_type( $post_id ), $enabled_types, true ) ) {
+				header( 'Vary: Accept', false ); // Append, don't replace.
 			}
 		}
 	}

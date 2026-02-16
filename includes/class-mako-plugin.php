@@ -156,11 +156,7 @@ final class Mako_Plugin {
 	}
 
 	public function render_alternate_link(): void {
-		if ( ! is_singular() ) {
-			return;
-		}
-
-		$post_id = get_queried_object_id();
+		$post_id = self::get_current_mako_post_id();
 		if ( ! $post_id ) {
 			return;
 		}
@@ -191,11 +187,7 @@ final class Mako_Plugin {
 	 * without content negotiation. Output is compact to minimize HTML bloat.
 	 */
 	public function render_mako_embedding(): void {
-		if ( ! is_singular() ) {
-			return;
-		}
-
-		$post_id = get_queried_object_id();
+		$post_id = self::get_current_mako_post_id();
 		if ( ! $post_id ) {
 			return;
 		}
@@ -258,6 +250,27 @@ final class Mako_Plugin {
 
 		$cron = new Mako_Cron();
 		$cron->register();
+	}
+
+	/**
+	 * Get the post ID for the current request, including WooCommerce special pages.
+	 *
+	 * Returns the post ID if we're on a singular page OR on a WooCommerce shop page
+	 * (which WordPress treats as an archive, not singular). Returns 0 if no valid
+	 * post context exists.
+	 */
+	public static function get_current_mako_post_id(): int {
+		if ( is_singular() ) {
+			return get_queried_object_id();
+		}
+
+		// WooCommerce shop page: WordPress treats it as a product archive,
+		// but it has a backing page with MAKO content.
+		if ( function_exists( 'is_shop' ) && is_shop() ) {
+			return (int) wc_get_page_id( 'shop' );
+		}
+
+		return 0;
 	}
 
 	/**
