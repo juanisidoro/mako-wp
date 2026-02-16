@@ -137,11 +137,11 @@ A MAKO file is a UTF-8 markdown document with YAML frontmatter that provides an 
 - type: one of product|article|docs|landing|listing|profile|event|recipe|faq|custom
 - entity: primary entity name (max 100 chars)
 - updated: ISO 8601 datetime
-- tokens: approximate token count of the BODY only (not frontmatter)
+- tokens: approximate token count of the BODY only (not frontmatter). Calculate as: word_count × 1.3
 - language: BCP 47 code
 
 ## Optional frontmatter fields
-- summary: max 160 chars, factual, no marketing
+- summary: max 160 chars. MUST describe the entity itself (what it is, key feature, price). NOT a shipping policy or generic text.
 - freshness: realtime|daily|weekly|monthly|static
 - canonical: URL of the HTML version
 - media: cover (url + alt) and counts (images, video, audio, interactive, downloads)
@@ -150,13 +150,15 @@ A MAKO file is a UTF-8 markdown document with YAML frontmatter that provides an 
 - links: internal (url + context) and external (url + context)
 
 ## Body rules
-1. Lead with the most important facts
+1. Lead with the most important facts about the entity
 2. Use ## headings to structure sections
 3. Prefer bullet lists and key-value pairs over prose
 4. Omit: navigation, legal boilerplate, UI chrome, marketing fluff, emojis, social media CTAs
-5. Preserve factual content: prices, specs, availability, shipping, reviews
+5. Preserve ALL factual content: prices, specs, availability, shipping, dimensions, materials, reviews
 6. Use the page language consistently (do NOT mix languages)
 7. HTML entities must be decoded (use € not &euro;)
+8. If a section has NO data from the source, OMIT IT entirely. Do NOT write "no data available" or similar.
+9. For products: include ALL available attributes (size, color, material, weight, brand, SKU)
 
 ## Links format (spec-compliant)
 ```yaml
@@ -174,7 +176,8 @@ Note: links only have url + context. No other fields.
 1. Output ONLY the MAKO file. No explanations, no code fences, no preamble.
 2. Start with --- and end frontmatter with ---
 3. Do NOT invent facts not present in the source content.
-4. The tokens field must reflect the actual body token count, not a copy from the base.
+4. You MUST recalculate the tokens field based on the actual body you generate. Do NOT copy it from the base.
+5. The summary MUST describe the entity. Example for product: "Camiseta básica manga mini, talla única beige. €10. Agotado."
 SYSTEM;
 
 		$user = "Generate a MAKO file for this page.\n\n";
@@ -184,16 +187,118 @@ SYSTEM;
 		$user .= "- Language: {$this->get_language($post)}\n";
 		$user .= "- Token target: {$limits[0]}-{$limits[1]} (max 1000)\n";
 		$user .= "- Recommended sections: {$sections}\n";
+
+		// Add structured product data for WooCommerce products.
+		$product_context = $this->get_product_context( $post );
+		if ( '' !== $product_context ) {
+			$user .= "\n## Product Data (structured)\n\n{$product_context}\n";
+		}
+
 		$user .= "\n## Page Content\n\n{$clean_content}\n";
 
 		if ( '' !== $current_mako ) {
-			$user .= "\n## Current MAKO (auto-generated base, improve it)\n\n{$current_mako}\n";
+			// Strip the tokens line so the AI is forced to recalculate.
+			$base_mako = preg_replace( '/^tokens:\s*\d+\s*$/m', 'tokens: [CALCULATE]', $current_mako );
+			$user .= "\n## Current MAKO (auto-generated base, improve it)\n\n{$base_mako}\n";
 		}
 
 		return array(
 			'system' => $system,
 			'user'   => $user,
 		);
+	}
+
+	/**
+	 * Extract structured product data from WooCommerce.
+	 */
+	private function get_product_context( WP_Post $post ): string {
+		if ( 'product' !== $post->post_type || ! function_exists( 'wc_get_product' ) ) {
+			return '';
+		}
+
+		$product = wc_get_product( $post->ID );
+		if ( ! $product ) {
+			return '';
+		}
+
+		$lines = array();
+
+		// Basic info.
+		$lines[] = '- Name: ' . $product->get_name();
+		$lines[] = '- Price: €' . $product->get_price();
+
+		if ( $product->get_regular_price() !== $product->get_sale_price() && $product->get_sale_price() ) {
+			$lines[] = '- Regular price: €' . $product->get_regular_price();
+			$lines[] = '- Sale price: €' . $product->get_sale_price();
+		}
+
+		$lines[] = '- In stock: ' . ( $product->is_in_stock() ? 'Yes' : 'No (Agotado)' );
+		$lines[] = '- Stock status: ' . $product->get_stock_status();
+
+		if ( $product->get_sku() ) {
+			$lines[] = '- SKU: ' . $product->get_sku();
+		}
+
+		// Short description.
+		$short_desc = $product->get_short_description();
+		if ( $short_desc ) {
+			$short_desc = wp_strip_all_tags( $short_desc );
+			$short_desc = html_entity_decode( $short_desc, ENT_QUOTES, 'UTF-8' );
+			$lines[] = '- Short description: ' . trim( $short_desc );
+		}
+
+		// Categories.
+		$cats = wp_get_post_terms( $post->ID, 'product_cat', array( 'fields' => 'names' ) );
+		if ( ! is_wp_error( $cats ) && ! empty( $cats ) ) {
+			$lines[] = '- Categories: ' . implode( ', ', $cats );
+		}
+
+		// Tags.
+		$tags = wp_get_post_terms( $post->ID, 'product_tag', array( 'fields' => 'names' ) );
+		if ( ! is_wp_error( $tags ) && ! empty( $tags ) ) {
+			$lines[] = '- Tags: ' . implode( ', ', $tags );
+		}
+
+		// Attributes.
+		$attributes = $product->get_attributes();
+		foreach ( $attributes as $attr ) {
+			$name = wc_attribute_label( $attr->get_name() );
+			if ( $attr->is_taxonomy() ) {
+				$values = wc_get_product_terms( $post->ID, $attr->get_name(), array( 'fields' => 'names' ) );
+				$value  = implode( ', ', $values );
+			} else {
+				$value = implode( ', ', $attr->get_options() );
+			}
+			if ( $value ) {
+				$lines[] = "- {$name}: {$value}";
+			}
+		}
+
+		// Weight and dimensions.
+		if ( $product->get_weight() ) {
+			$lines[] = '- Weight: ' . $product->get_weight() . ' ' . get_option( 'woocommerce_weight_unit', 'kg' );
+		}
+
+		$dims = $product->get_dimensions( false );
+		if ( $dims && array_filter( $dims ) ) {
+			$unit = get_option( 'woocommerce_dimension_unit', 'cm' );
+			$parts = array();
+			if ( $dims['length'] ) $parts[] = $dims['length'];
+			if ( $dims['width'] )  $parts[] = $dims['width'];
+			if ( $dims['height'] ) $parts[] = $dims['height'];
+			if ( $parts ) {
+				$lines[] = '- Dimensions: ' . implode( ' × ', $parts ) . ' ' . $unit;
+			}
+		}
+
+		// Reviews.
+		$review_count = $product->get_review_count();
+		if ( $review_count > 0 ) {
+			$lines[] = '- Average rating: ' . $product->get_average_rating() . '/5';
+			$lines[] = '- Reviews: ' . $review_count;
+		}
+
+		return implode( "\n", $lines );
 	}
 
 	/**
