@@ -468,6 +468,27 @@
 	border-color: #4ade80 !important;
 }
 
+/* AI Usage Feedback */
+.mako-ai-feedback {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 8px 12px;
+	background: #f0f9ff;
+	border: 1px solid #bae6fd;
+	border-radius: 4px;
+	font-size: 12px;
+	color: #0c4a6e;
+}
+
+.mako-ai-feedback .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+	color: #0284c7;
+}
+
 /* Spinner */
 .mako-spinner {
 	display: inline-block;

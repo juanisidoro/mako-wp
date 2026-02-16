@@ -367,6 +367,7 @@ class Mako_Admin {
 			'content'  => $result['content'],
 			'model'    => $result['model'],
 			'provider' => $result['provider'],
+			'usage'    => $result['usage'] ?? array(),
 		) );
 	}
 

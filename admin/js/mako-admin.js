@@ -119,6 +119,9 @@
 		var originalHtml = $button.html();
 		$button.prop('disabled', true).html('<span class="mako-spinner"></span>' + config.i18n.aiGenerating);
 
+		// Remove previous feedback.
+		$('#mako-ai-feedback').remove();
+
 		$.post(config.ajaxUrl, {
 			action: 'mako_ai_generate',
 			nonce: config.nonce,
@@ -128,6 +131,18 @@
 			if (response.success) {
 				$('#mako_custom_content').val(response.data.content);
 				$button.html(originalHtml);
+
+				// Show usage feedback.
+				var d = response.data;
+				var usage = d.usage || {};
+				var feedback = '<div id="mako-ai-feedback" class="mako-ai-feedback">' +
+					'<span class="dashicons dashicons-info-outline"></span> ' +
+					'<strong>' + (d.provider || '') + '/' + (d.model || '') + '</strong>' +
+					' — ' + (usage.input_tokens || 0).toLocaleString() + ' input + ' +
+					(usage.output_tokens || 0).toLocaleString() + ' output = ' +
+					(usage.total_tokens || 0).toLocaleString() + ' tokens' +
+					'</div>';
+				$('.mako-meta-actions').after(feedback);
 			} else {
 				alert((config.i18n.aiError || 'AI generation failed') + ': ' + (response.data || ''));
 				$button.html(originalHtml);

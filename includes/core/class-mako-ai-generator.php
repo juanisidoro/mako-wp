@@ -51,7 +51,7 @@ class Mako_AI_Generator {
 	 *
 	 * @param int    $post_id The WordPress post ID.
 	 * @param string $current_mako The current auto-generated MAKO content (as base).
-	 * @return array{content: string, model: string, provider: string}|WP_Error
+	 * @return array{content: string, model: string, provider: string, usage: array}|WP_Error
 	 */
 	public function generate( int $post_id, string $current_mako = '' ) {
 		$provider = get_option( 'mako_ai_provider', '' );
@@ -92,58 +92,29 @@ class Mako_AI_Generator {
 		}
 
 		return array(
-			'content'  => $result,
+			'content'  => $result['content'],
 			'model'    => $model,
 			'provider' => $provider,
+			'usage'    => $result['usage'],
 		);
 	}
 
 	/**
-	 * Build the master prompt with MAKO spec, best practices, and page content.
+	 * Build the system and user prompts.
+	 *
+	 * @return array{system: string, user: string}
 	 */
-	private function build_prompt( WP_Post $post, string $current_mako ): string {
+	private function build_prompt( WP_Post $post, string $current_mako ): array {
 		$type_detector = new Mako_Type_Detector();
 		$type          = $type_detector->detect( $post, '' );
 		$limits        = self::TOKEN_LIMITS[ $type ] ?? self::TOKEN_LIMITS['custom'];
 		$permalink     = get_permalink( $post->ID );
 
-		$prompt = <<<PROMPT
-You are a MAKO content specialist. Generate a MAKO file for the following web page.
-
-## MAKO Standard (v1.0)
-
-A MAKO file is a UTF-8 markdown document with YAML frontmatter. It provides an AI-optimized representation of a web page.
-
-### Required frontmatter fields:
-- mako: "1.0" (MUST be quoted string)
-- type: {$type}
-- entity: Primary entity name (max 100 chars)
-- updated: ISO 8601 date
-- tokens: Estimated token count of the body
-- language: BCP 47 language code
-
-### Optional frontmatter fields:
-- summary: One-line summary (max 160 chars)
-- media: cover image + media counts from the source page
-- freshness: realtime | daily | weekly | monthly | static
-- canonical: URL of the HTML version
-- tags: Content tags/categories
-- actions: Available actions (name + description + endpoint)
-- links: Semantic links with context (internal + external)
-
-### Body rules:
-1. Lead with the most important information
-2. Use structured sections with ## headings
-3. Prefer lists and key-value pairs over prose
-4. Include context and comparisons (competitors, alternatives, trade-offs)
-5. Omit navigation, legal boilerplate, UI text, and marketing fluff
-6. Token target for type "{$type}": {$limits[0]}-{$limits[1]} tokens. NEVER exceed 1000.
-
-### Content type "{$type}" recommended sections:
-PROMPT;
+		// Get clean rendered content instead of raw shortcodes/HTML.
+		$clean_content = $this->get_clean_content( $post );
 
 		$section_map = array(
-			'product' => 'Key Facts, Context, Reviews Summary',
+			'product' => 'Key Facts (price, availability, brand, SKU), Shipping, Reviews Summary',
 			'article' => 'Summary, Key Points, Context',
 			'docs'    => 'Overview, Usage, Parameters/API, See Also',
 			'landing' => 'What It Does, Key Features, Pricing, Alternatives',
@@ -154,79 +125,107 @@ PROMPT;
 			'faq'     => 'Q&A pairs as ## headings',
 			'custom'  => 'Adapt sections to content',
 		);
-
 		$sections = $section_map[ $type ] ?? $section_map['custom'];
-		$prompt  .= "\n{$sections}\n";
 
-		$prompt .= <<<PROMPT
+		$system = <<<SYSTEM
+You are a MAKO content specialist. You generate MAKO files following the MAKO v1.0 standard.
 
-### Actions format:
-```yaml
-actions:
-  - name: action_name (snake_case)
-    description: "What this action does"
-    endpoint: /api/endpoint (if known)
-    method: POST
-```
+A MAKO file is a UTF-8 markdown document with YAML frontmatter that provides an AI-optimized representation of a web page.
 
-### Links format:
+## Required frontmatter fields
+- mako: "1.0" (MUST be quoted string, not number)
+- type: one of product|article|docs|landing|listing|profile|event|recipe|faq|custom
+- entity: primary entity name (max 100 chars)
+- updated: ISO 8601 datetime
+- tokens: approximate token count of the BODY only (not frontmatter)
+- language: BCP 47 code
+
+## Optional frontmatter fields
+- summary: max 160 chars, factual, no marketing
+- freshness: realtime|daily|weekly|monthly|static
+- canonical: URL of the HTML version
+- media: cover (url + alt) and counts (images, video, audio, interactive, downloads)
+- tags: content categories
+- actions: name + description + endpoint + method + params
+- links: internal (url + context) and external (url + context)
+
+## Body rules
+1. Lead with the most important facts
+2. Use ## headings to structure sections
+3. Prefer bullet lists and key-value pairs over prose
+4. Omit: navigation, legal boilerplate, UI chrome, marketing fluff, emojis, social media CTAs
+5. Preserve factual content: prices, specs, availability, shipping, reviews
+6. Use the page language consistently (do NOT mix languages)
+7. HTML entities must be decoded (use € not &euro;)
+
+## Links format (spec-compliant)
 ```yaml
 links:
   internal:
-    - url: /relative-path
-      context: "Why this link is relevant"
-      type: parent|child|sibling|reference
+    - url: /path
+      context: "Short description"
   external:
     - url: https://example.com
-      context: "Why this link is relevant"
-      type: source|competitor|reference
+      context: "Short description"
 ```
+Note: links only have url + context. No other fields.
 
-## Page Information
+## Output rules
+1. Output ONLY the MAKO file. No explanations, no code fences, no preamble.
+2. Start with --- and end frontmatter with ---
+3. Do NOT invent facts not present in the source content.
+4. The tokens field must reflect the actual body token count, not a copy from the base.
+SYSTEM;
 
-- URL: {$permalink}
-- Title: {$post->post_title}
-- Type: {$post->post_type}
-- Language: {$this->get_language($post)}
-- Updated: {$post->post_modified_gmt}
-
-## Page Content
-
-{$post->post_content}
-
-PROMPT;
+		$user = "Generate a MAKO file for this page.\n\n";
+		$user .= "- URL: {$permalink}\n";
+		$user .= "- Title: {$post->post_title}\n";
+		$user .= "- Type: {$type}\n";
+		$user .= "- Language: {$this->get_language($post)}\n";
+		$user .= "- Token target: {$limits[0]}-{$limits[1]} (max 1000)\n";
+		$user .= "- Recommended sections: {$sections}\n";
+		$user .= "\n## Page Content\n\n{$clean_content}\n";
 
 		if ( '' !== $current_mako ) {
-			$prompt .= <<<PROMPT
-
-## Current MAKO (auto-generated, use as base to improve)
-
-{$current_mako}
-
-PROMPT;
+			$user .= "\n## Current MAKO (auto-generated base, improve it)\n\n{$current_mako}\n";
 		}
 
-		$prompt .= <<<PROMPT
+		return array(
+			'system' => $system,
+			'user'   => $user,
+		);
+	}
 
-## Instructions
+	/**
+	 * Get clean rendered content for the post (strips shortcodes/builder HTML).
+	 */
+	private function get_clean_content( WP_Post $post ): string {
+		// Try to use the rendered content (processes shortcodes, blocks, etc).
+		$content = apply_filters( 'the_content', $post->post_content );
 
-Generate a complete, valid MAKO file (frontmatter + body) for this page. Rules:
-1. Output ONLY the MAKO file. No explanations, no code fences, no commentary.
-2. Start with --- and end the frontmatter with ---
-3. Base the content ONLY on the actual page content provided above. Do NOT invent facts.
-4. Keep within {$limits[0]}-{$limits[1]} tokens for the body.
-5. Include semantic links and actions if applicable to this content type.
-6. The summary must be max 160 characters and describe what this page is about.
-7. Quote the mako version as "1.0" (string, not number).
-PROMPT;
+		// Strip HTML tags but keep structure with newlines.
+		$content = preg_replace( '/<br\s*\/?>/i', "\n", $content );
+		$content = preg_replace( '/<\/(?:p|div|li|h[1-6]|tr)>/i', "\n", $content );
+		$content = wp_strip_all_tags( $content );
 
-		return $prompt;
+		// Clean up whitespace.
+		$content = preg_replace( '/\n{3,}/', "\n\n", $content );
+		$content = html_entity_decode( $content, ENT_QUOTES, 'UTF-8' );
+
+		// Truncate to ~8000 chars to stay within API limits.
+		if ( strlen( $content ) > 8000 ) {
+			$content = substr( $content, 0, 8000 ) . "\n\n[Content truncated]";
+		}
+
+		return trim( $content );
 	}
 
 	/**
 	 * Call OpenAI API.
+	 *
+	 * @return array{content: string, usage: array}|WP_Error
 	 */
-	private function call_openai( string $api_key, string $model, string $prompt, string $endpoint ): string|WP_Error {
+	private function call_openai( string $api_key, string $model, array $prompt, string $endpoint ): array|WP_Error {
 		$response = wp_remote_post( $endpoint, array(
 			'timeout' => 60,
 			'headers' => array(
@@ -236,7 +235,8 @@ PROMPT;
 			'body'    => wp_json_encode( array(
 				'model'       => $model,
 				'messages'    => array(
-					array( 'role' => 'user', 'content' => $prompt ),
+					array( 'role' => 'system', 'content' => $prompt['system'] ),
+					array( 'role' => 'user', 'content' => $prompt['user'] ),
 				),
 				'max_tokens'  => 2000,
 				'temperature' => 0.3,
@@ -256,14 +256,24 @@ PROMPT;
 		}
 
 		$content = $body['choices'][0]['message']['content'] ?? '';
+		$usage   = $body['usage'] ?? array();
 
-		return $this->clean_ai_output( $content );
+		return array(
+			'content' => $this->clean_ai_output( $content ),
+			'usage'   => array(
+				'input_tokens'  => $usage['prompt_tokens'] ?? 0,
+				'output_tokens' => $usage['completion_tokens'] ?? 0,
+				'total_tokens'  => $usage['total_tokens'] ?? 0,
+			),
+		);
 	}
 
 	/**
 	 * Call Anthropic API.
+	 *
+	 * @return array{content: string, usage: array}|WP_Error
 	 */
-	private function call_anthropic( string $api_key, string $model, string $prompt, string $endpoint ): string|WP_Error {
+	private function call_anthropic( string $api_key, string $model, array $prompt, string $endpoint ): array|WP_Error {
 		$response = wp_remote_post( $endpoint, array(
 			'timeout' => 60,
 			'headers' => array(
@@ -274,9 +284,11 @@ PROMPT;
 			'body'    => wp_json_encode( array(
 				'model'      => $model,
 				'max_tokens' => 2000,
+				'system'     => $prompt['system'],
 				'messages'   => array(
-					array( 'role' => 'user', 'content' => $prompt ),
+					array( 'role' => 'user', 'content' => $prompt['user'] ),
 				),
+				'temperature' => 0.3,
 			) ),
 		) );
 
@@ -293,8 +305,16 @@ PROMPT;
 		}
 
 		$content = $body['content'][0]['text'] ?? '';
+		$usage   = $body['usage'] ?? array();
 
-		return $this->clean_ai_output( $content );
+		return array(
+			'content' => $this->clean_ai_output( $content ),
+			'usage'   => array(
+				'input_tokens'  => $usage['input_tokens'] ?? 0,
+				'output_tokens' => $usage['output_tokens'] ?? 0,
+				'total_tokens'  => ( $usage['input_tokens'] ?? 0 ) + ( $usage['output_tokens'] ?? 0 ),
+			),
+		);
 	}
 
 	/**
