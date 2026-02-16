@@ -166,11 +166,13 @@ links:
   internal:
     - url: /path
       context: "Short description"
+      type: parent|child|sibling
   external:
     - url: https://example.com
       context: "Short description"
+      type: source|competitor|reference
 ```
-Note: links only have url + context. No other fields.
+Each link has url + context (required) and type (optional). Valid types: parent, child, sibling, source, competitor, reference.
 
 ## Output rules
 1. Output ONLY the MAKO file. No explanations, no code fences, no preamble.
