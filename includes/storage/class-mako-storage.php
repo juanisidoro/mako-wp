@@ -233,17 +233,35 @@ class Mako_Storage {
 
 	/**
 	 * Get posts that have MAKO content generated.
+	 *
+	 * @param int      $limit     Max posts to return.
+	 * @param int      $offset    Offset for pagination.
+	 * @param string[] $post_types Filter by post types (empty = all).
 	 */
-	public function get_generated_posts( int $limit = 50, int $offset = 0 ): array {
+	public function get_generated_posts( int $limit = 50, int $offset = 0, array $post_types = array() ): array {
 		global $wpdb;
 
+		$where = $wpdb->prepare(
+			"pm.meta_key = %s AND pm.meta_value != ''",
+			self::META_CONTENT
+		);
+
+		if ( ! empty( $post_types ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $post_types ), '%s' ) );
+			$where .= $wpdb->prepare(
+				" AND p.post_type IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL
+				...$post_types
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$post_ids = $wpdb->get_col(
 			$wpdb->prepare(
-				"SELECT DISTINCT post_id FROM {$wpdb->postmeta}
-				WHERE meta_key = %s AND meta_value != ''
-				ORDER BY post_id DESC
+				"SELECT DISTINCT pm.post_id FROM {$wpdb->postmeta} pm
+				INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+				WHERE {$where}
+				ORDER BY pm.post_id DESC
 				LIMIT %d OFFSET %d",
-				self::META_CONTENT,
 				$limit,
 				$offset
 			)
@@ -269,6 +287,35 @@ class Mako_Storage {
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Count posts that have MAKO content generated.
+	 *
+	 * @param string[] $post_types Filter by post types (empty = all).
+	 */
+	public function count_generated_posts( array $post_types = array() ): int {
+		global $wpdb;
+
+		$where = $wpdb->prepare(
+			"pm.meta_key = %s AND pm.meta_value != ''",
+			self::META_CONTENT
+		);
+
+		if ( ! empty( $post_types ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $post_types ), '%s' ) );
+			$where .= $wpdb->prepare(
+				" AND p.post_type IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL
+				...$post_types
+			);
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var(
+			"SELECT COUNT(DISTINCT pm.post_id) FROM {$wpdb->postmeta} pm
+			INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+			WHERE {$where}"
+		);
 	}
 
 	/**

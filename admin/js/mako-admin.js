@@ -7,6 +7,7 @@
 		paused: false,
 		processed: 0,
 		total: 0,
+		batchLimit: 0, // 0 = unlimited (all pending)
 		timer: null
 	};
 
@@ -22,6 +23,14 @@
 			types.push($(this).val());
 		});
 		return types;
+	}
+
+	function getSelectedPostIds() {
+		var ids = [];
+		$('.mako-row-check:checked').each(function () {
+			ids.push(parseInt($(this).val(), 10));
+		});
+		return ids;
 	}
 
 	function logMessage(msg, type) {
@@ -58,7 +67,7 @@
 
 	function setControls(state) {
 		$('#mako-test-one').prop('disabled', state !== 'idle');
-		$('#mako-start-bulk').prop('disabled', state !== 'idle');
+		$('.mako-btn-batch').prop('disabled', state !== 'idle');
 		$('#mako-pause-bulk').prop('disabled', state !== 'running').text(
 			state === 'paused' ? config.i18n.resume : config.i18n.pause
 		);
@@ -91,7 +100,6 @@
 							$editor.val(prev.data.content);
 						}
 					});
-					// Update metrics inline.
 					$('.mako-meta-metrics').show();
 				} else {
 					setTimeout(function () {
@@ -119,7 +127,6 @@
 		var originalHtml = $button.html();
 		$button.prop('disabled', true).html('<span class="mako-spinner"></span>' + config.i18n.aiGenerating);
 
-		// Remove previous feedback.
 		$('#mako-ai-feedback').remove();
 
 		$.post(config.ajaxUrl, {
@@ -132,7 +139,6 @@
 				$('#mako_custom_content').val(response.data.content);
 				$button.html(originalHtml);
 
-				// Show usage feedback.
 				var d = response.data;
 				var usage = d.usage || {};
 				var feedback = '<div id="mako-ai-feedback" class="mako-ai-feedback">' +
@@ -247,20 +253,188 @@
 		});
 	}
 
-	// --- Bulk generation (one at a time) ---
+	// --- Bulk Actions (delete/regenerate selected) ---
 
-	function processNext() {
+	function bulkDelete(postIds) {
+		if (!confirm(config.i18n.confirmBulkDelete || 'Delete MAKO for selected posts?')) {
+			return;
+		}
+
+		$.post(config.ajaxUrl, {
+			action: 'mako_bulk_delete',
+			nonce: config.nonce,
+			post_ids: postIds
+		})
+		.done(function (response) {
+			if (response.success) {
+				postIds.forEach(function (id) {
+					$('#mako-row-' + id).fadeOut(300, function () {
+						$(this).remove();
+					});
+				});
+				var msg = (config.i18n.bulkDeleted || 'Deleted MAKO for %d posts.').replace('%d', response.data.deleted);
+				logMessage(msg, 'done');
+			} else {
+				alert(response.data || 'Bulk delete failed');
+			}
+		});
+	}
+
+	function bulkRegenerate(postIds) {
+		if (!confirm(config.i18n.confirmBulkRegen || 'Regenerate MAKO for selected posts?')) {
+			return;
+		}
+
+		bulkState.running = true;
+		bulkState.paused = false;
+		bulkState.processed = 0;
+		bulkState.total = postIds.length;
+
+		updateProgress(0, postIds.length);
+		setControls('running');
+		logMessage(config.i18n.batchStarting + ' ' + postIds.length + ' posts');
+
+		function regenNext(index) {
+			if (!bulkState.running || bulkState.paused) {
+				return;
+			}
+
+			if (index >= postIds.length) {
+				logMessage(config.i18n.bulkRegenDone, 'done');
+				stopBulk();
+				setTimeout(function () { window.location.reload(); }, 1500);
+				return;
+			}
+
+			$.post(config.ajaxUrl, {
+				action: 'mako_bulk_regenerate_next',
+				nonce: config.nonce,
+				post_ids: postIds,
+				index: index
+			})
+			.done(function (response) {
+				if (!response.success) {
+					logMessage(config.i18n.error + ': ' + (response.data || ''), 'error');
+					stopBulk();
+					return;
+				}
+
+				var d = response.data;
+				bulkState.processed = index + 1;
+
+				if (d.skipped) {
+					logMessage('<strong>' + d.title + '</strong> — ' + config.i18n.skipped + ' (' + d.reason + ')', 'skip');
+				} else {
+					logMessage(
+						'<strong>' + d.title + '</strong> — ' +
+						d.type + ' · ' + d.html_tokens + ' → ' + d.tokens + ' tokens · ' +
+						d.savings + '% ' + config.i18n.savings
+					);
+				}
+
+				updateProgress(bulkState.processed, bulkState.total);
+
+				if (!bulkState.running || bulkState.paused) return;
+
+				var delay = parseInt($('#mako-delay').val(), 10) || 3000;
+				bulkState.timer = setTimeout(function () { regenNext(index + 1); }, delay);
+			})
+			.fail(function () {
+				logMessage(config.i18n.error + ': Network error', 'error');
+				stopBulk();
+			});
+		}
+
+		regenNext(0);
+	}
+
+	function applyBulkAction(selectorId) {
+		var action = $(selectorId).val();
+		var postIds = getSelectedPostIds();
+
+		if (!action) {
+			alert(config.i18n.selectAction || 'Select a bulk action.');
+			return;
+		}
+		if (postIds.length === 0) {
+			alert(config.i18n.noSelection || 'No posts selected.');
+			return;
+		}
+
+		if (action === 'delete') {
+			bulkDelete(postIds);
+		} else if (action === 'regenerate') {
+			bulkRegenerate(postIds);
+		}
+	}
+
+	// --- Batch generation (generate N pending posts) ---
+
+	function startBatch(limit) {
+		var types = getSelectedPostTypes();
+		if (types.length === 0) {
+			logMessage(config.i18n.noTypesSelected || 'Select at least one post type.', 'error');
+			return;
+		}
+
+		// First, get the queue to know how many are pending.
+		$.post(config.ajaxUrl, {
+			action: 'mako_get_queue',
+			nonce: config.nonce,
+			post_types: types
+		})
+		.done(function (response) {
+			if (!response.success) {
+				logMessage(config.i18n.error, 'error');
+				return;
+			}
+
+			var d = response.data;
+
+			if (d.pending === 0) {
+				logMessage(config.i18n.noPending, 'done');
+				return;
+			}
+
+			// Determine how many to process.
+			var toProcess = limit > 0 ? Math.min(limit, d.pending) : d.pending;
+
+			bulkState.total = toProcess;
+			bulkState.processed = 0;
+			bulkState.batchLimit = toProcess;
+			bulkState.running = true;
+			bulkState.paused = false;
+
+			updateProgress(0, toProcess);
+			setControls('running');
+
+			logMessage(
+				(config.i18n.batchStarting || 'Starting batch:') + ' ' +
+				toProcess + ' / ' + d.pending + ' ' + (config.i18n.pending || 'pending')
+			);
+
+			processBatchNext(types);
+		});
+	}
+
+	function processBatchNext(types) {
 		if (!bulkState.running || bulkState.paused) {
 			return;
 		}
 
+		// Check if we've reached the batch limit.
+		if (bulkState.batchLimit > 0 && bulkState.processed >= bulkState.batchLimit) {
+			logMessage(config.i18n.batchDone || 'Batch complete!', 'done');
+			stopBulk();
+			setTimeout(function () { window.location.reload(); }, 1500);
+			return;
+		}
+
 		var data = {
-			action: 'mako_generate_next',
+			action: 'mako_generate_batch_next',
 			nonce: config.nonce
 		};
-
-		var types = getSelectedPostTypes();
-		if (types.length > 0) {
+		if (types && types.length > 0) {
 			data.post_types = types;
 		}
 
@@ -275,12 +449,10 @@
 			var d = response.data;
 
 			if (d.done) {
-				logMessage(config.i18n.bulkDone, 'done');
+				logMessage(config.i18n.bulkDone || 'All done!', 'done');
 				stopBulk();
 				updateProgress(bulkState.total, bulkState.total);
-				setTimeout(function () {
-					window.location.reload();
-				}, 1500);
+				setTimeout(function () { window.location.reload(); }, 1500);
 				return;
 			}
 
@@ -303,12 +475,10 @@
 
 			updateProgress(bulkState.processed, bulkState.total);
 
-			if (!bulkState.running || bulkState.paused) {
-				return;
-			}
+			if (!bulkState.running || bulkState.paused) return;
 
 			var delay = parseInt($('#mako-delay').val(), 10) || 3000;
-			bulkState.timer = setTimeout(processNext, delay);
+			bulkState.timer = setTimeout(function () { processBatchNext(types); }, delay);
 		})
 		.fail(function () {
 			logMessage(config.i18n.error + ': Network error', 'error');
@@ -316,57 +486,16 @@
 		});
 	}
 
-	function startBulk() {
-		var types = getSelectedPostTypes();
-		if (types.length === 0) {
-			logMessage(config.i18n.noTypesSelected || 'Select at least one post type.', 'error');
-			return;
-		}
-
-		var data = {
-			action: 'mako_get_queue',
-			nonce: config.nonce,
-			post_types: types
-		};
-
-		$.post(config.ajaxUrl, data)
-		.done(function (response) {
-			if (!response.success) {
-				logMessage(config.i18n.error, 'error');
-				return;
-			}
-
-			var d = response.data;
-
-			if (d.pending === 0) {
-				logMessage(config.i18n.noPending, 'done');
-				return;
-			}
-
-			bulkState.total = d.pending + d.generated;
-			bulkState.processed = d.generated;
-			bulkState.running = true;
-			bulkState.paused = false;
-
-			updateProgress(bulkState.processed, bulkState.total);
-			setControls('running');
-
-			logMessage(
-				config.i18n.starting + ' ' +
-				d.pending + ' ' + config.i18n.pending + ' / ' +
-				d.total + ' ' + config.i18n.totalPosts
-			);
-
-			processNext();
-		});
-	}
+	// --- Controls ---
 
 	function pauseBulk() {
 		if (bulkState.paused) {
 			bulkState.paused = false;
 			setControls('running');
 			logMessage(config.i18n.resumed);
-			processNext();
+			// Resume: we need to know what types were selected.
+			var types = getSelectedPostTypes();
+			processBatchNext(types);
 		} else {
 			bulkState.paused = true;
 			if (bulkState.timer) {
@@ -381,6 +510,7 @@
 	function stopBulk() {
 		bulkState.running = false;
 		bulkState.paused = false;
+		bulkState.batchLimit = 0;
 		if (bulkState.timer) {
 			clearTimeout(bulkState.timer);
 			bulkState.timer = null;
@@ -398,13 +528,11 @@
 		setControls('running');
 		logMessage(config.i18n.testingOne);
 
-		var data = {
+		$.post(config.ajaxUrl, {
 			action: 'mako_generate_next',
 			nonce: config.nonce,
 			post_types: types
-		};
-
-		$.post(config.ajaxUrl, data)
+		})
 		.done(function (response) {
 			if (!response.success) {
 				logMessage(config.i18n.error + ': ' + (response.data || ''), 'error');
@@ -437,9 +565,7 @@
 			}
 
 			setControls('idle');
-			setTimeout(function () {
-				window.location.reload();
-			}, 2000);
+			setTimeout(function () { window.location.reload(); }, 2000);
 		})
 		.fail(function () {
 			logMessage(config.i18n.error + ': Network error', 'error');
@@ -486,6 +612,32 @@
 			deleteMako($(this).data('post-id'));
 		});
 
+		// Select all checkbox.
+		$('#mako-select-all').on('change', function () {
+			$('.mako-row-check').prop('checked', $(this).prop('checked'));
+		});
+
+		// Update select-all state when individual checkboxes change.
+		$(document).on('change', '.mako-row-check', function () {
+			var total = $('.mako-row-check').length;
+			var checked = $('.mako-row-check:checked').length;
+			$('#mako-select-all').prop('checked', total === checked);
+		});
+
+		// Bulk action apply.
+		$(document).on('click', '.mako-btn-apply-bulk', function (e) {
+			e.preventDefault();
+			var selectorId = $(this).data('selector');
+			applyBulkAction(selectorId);
+		});
+
+		// Batch generation buttons.
+		$(document).on('click', '.mako-btn-batch', function (e) {
+			e.preventDefault();
+			var limit = parseInt($(this).data('batch'), 10) || 0;
+			startBatch(limit);
+		});
+
 		// Copy preview content.
 		$('#mako-copy-preview').on('click', function () {
 			var content = $('#mako-preview-content').text();
@@ -514,11 +666,6 @@
 		$('#mako-test-one').on('click', function (e) {
 			e.preventDefault();
 			testOne();
-		});
-
-		$('#mako-start-bulk').on('click', function (e) {
-			e.preventDefault();
-			startBulk();
 		});
 
 		$('#mako-pause-bulk').on('click', function (e) {

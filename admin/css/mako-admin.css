@@ -489,6 +489,19 @@
 	color: #0284c7;
 }
 
+/* Batch Label */
+.mako-batch-label {
+	font-weight: 500;
+	font-size: 13px;
+}
+
+/* Table Count */
+.mako-table-count {
+	font-weight: 400;
+	font-size: 14px;
+	color: #646970;
+}
+
 /* Spinner */
 .mako-spinner {
 	display: inline-block;

@@ -24,6 +24,9 @@ class Mako_Admin {
 		add_action( 'wp_ajax_mako_flush_cache', array( $this, 'ajax_flush_cache' ) );
 		add_action( 'wp_ajax_mako_get_queue', array( $this, 'ajax_get_queue' ) );
 		add_action( 'wp_ajax_mako_ai_generate', array( $this, 'ajax_ai_generate' ) );
+		add_action( 'wp_ajax_mako_bulk_delete', array( $this, 'ajax_bulk_delete' ) );
+		add_action( 'wp_ajax_mako_bulk_regenerate_next', array( $this, 'ajax_bulk_regenerate_next' ) );
+		add_action( 'wp_ajax_mako_generate_batch_next', array( $this, 'ajax_generate_batch_next' ) );
 	}
 
 	public function enqueue_assets( string $hook ): void {
@@ -83,6 +86,14 @@ class Mako_Admin {
 				'aiGenerating'    => __( 'AI is generating...', 'mako-wp' ),
 				'aiDone'          => __( 'AI generation complete. Review the content below.', 'mako-wp' ),
 				'aiError'         => __( 'AI generation failed', 'mako-wp' ),
+				'confirmBulkDelete'   => __( 'Delete MAKO content for all selected posts?', 'mako-wp' ),
+				'confirmBulkRegen'    => __( 'Regenerate MAKO for all selected posts?', 'mako-wp' ),
+				'bulkDeleted'         => __( 'Deleted MAKO for %d posts.', 'mako-wp' ),
+				'bulkRegenDone'       => __( 'Bulk regeneration complete.', 'mako-wp' ),
+				'noSelection'         => __( 'No posts selected.', 'mako-wp' ),
+				'selectAction'        => __( 'Select a bulk action.', 'mako-wp' ),
+				'batchStarting'       => __( 'Starting batch generation:', 'mako-wp' ),
+				'batchDone'           => __( 'Batch complete!', 'mako-wp' ),
 			),
 		) );
 	}
@@ -369,6 +380,106 @@ class Mako_Admin {
 			'provider' => $result['provider'],
 			'usage'    => $result['usage'] ?? array(),
 		) );
+	}
+
+	/**
+	 * AJAX: Bulk delete MAKO content for multiple posts.
+	 */
+	public function ajax_bulk_delete(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$post_ids = isset( $_POST['post_ids'] ) && is_array( $_POST['post_ids'] )
+			? array_map( 'absint', $_POST['post_ids'] )
+			: array();
+
+		if ( empty( $post_ids ) ) {
+			wp_send_json_error( 'No posts selected' );
+		}
+
+		$storage = new Mako_Storage();
+		$deleted = 0;
+
+		foreach ( $post_ids as $post_id ) {
+			if ( $post_id > 0 ) {
+				$storage->delete( $post_id );
+				$deleted++;
+			}
+		}
+
+		wp_send_json_success( array( 'deleted' => $deleted ) );
+	}
+
+	/**
+	 * AJAX: Regenerate MAKO for the next post in a given list.
+	 *
+	 * Client sends the full list of post IDs and the current index.
+	 */
+	public function ajax_bulk_regenerate_next(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		$post_ids = isset( $_POST['post_ids'] ) && is_array( $_POST['post_ids'] )
+			? array_map( 'absint', $_POST['post_ids'] )
+			: array();
+		$index = isset( $_POST['index'] ) ? (int) $_POST['index'] : 0;
+
+		if ( empty( $post_ids ) || $index >= count( $post_ids ) ) {
+			wp_send_json_success( array( 'done' => true ) );
+			return;
+		}
+
+		$post_id   = $post_ids[ $index ];
+		$post      = get_post( $post_id );
+		$generator = new Mako_Generator();
+		$result    = $generator->generate( $post_id );
+
+		if ( $result ) {
+			$storage = new Mako_Storage();
+			$storage->save( $post_id, $result );
+
+			wp_send_json_success( array(
+				'done'        => false,
+				'index'       => $index,
+				'post_id'     => $post_id,
+				'title'       => $post ? $post->post_title : '#' . $post_id,
+				'type'        => $result['type'],
+				'tokens'      => $result['tokens'],
+				'html_tokens' => $result['html_tokens'],
+				'savings'     => $result['savings'],
+			) );
+		} else {
+			wp_send_json_success( array(
+				'done'    => false,
+				'index'   => $index,
+				'post_id' => $post_id,
+				'title'   => $post ? $post->post_title : '#' . $post_id,
+				'skipped' => true,
+				'reason'  => 'Could not generate MAKO content',
+			) );
+		}
+	}
+
+	/**
+	 * AJAX: Generate MAKO for the next pending post (batch mode with limit).
+	 *
+	 * Like generate_next but tracks remaining against a batch limit.
+	 */
+	public function ajax_generate_batch_next(): void {
+		check_ajax_referer( 'mako_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions' );
+		}
+
+		// Reuse the same logic as generate_next.
+		$this->ajax_generate_next();
 	}
 
 	/**

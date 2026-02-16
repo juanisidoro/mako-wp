@@ -141,7 +141,7 @@ A MAKO file is a UTF-8 markdown document with YAML frontmatter that provides an 
 - language: BCP 47 code
 
 ## Optional frontmatter fields
-- summary: max 160 chars. MUST describe the entity itself (what it is, key feature, price). NOT a shipping policy or generic text.
+- summary: max 160 chars. Answer: "If a user asks an AI about this page, what should it respond?" Must describe the entity itself (what it is, key features, price if applicable). NOT a shipping policy, marketing slogan, or generic text.
 - freshness: realtime|daily|weekly|monthly|static
 - canonical: URL of the HTML version
 - media: cover (url + alt) and counts (images, video, audio, interactive, downloads)
@@ -177,7 +177,7 @@ Note: links only have url + context. No other fields.
 2. Start with --- and end frontmatter with ---
 3. Do NOT invent facts not present in the source content.
 4. You MUST recalculate the tokens field based on the actual body you generate. Do NOT copy it from the base.
-5. The summary MUST describe the entity. Example for product: "Camiseta básica manga mini, talla única beige. €10. Agotado."
+5. The summary answers: "If a user asks an AI about this page, what should it respond?" Example for product: "Camiseta básica manga mini, talla única beige. €10. Agotado." Example for article: "Guide explaining how to set up MAKO content negotiation for WordPress sites."
 SYSTEM;
 
 		$user = "Generate a MAKO file for this page.\n\n";

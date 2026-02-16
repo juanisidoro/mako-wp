@@ -353,12 +353,20 @@ class Mako_Generator {
 	private function derive_summary( WP_Post $post, string $markdown ): string {
 		$max = 160;
 
-		// 1. Post excerpt.
+		// 1. WooCommerce products: structured summary from product data.
+		if ( 'product' === $post->post_type && function_exists( 'wc_get_product' ) ) {
+			$product_summary = $this->derive_product_summary( $post );
+			if ( '' !== $product_summary ) {
+				return $this->truncate_summary( $product_summary, $max );
+			}
+		}
+
+		// 2. Post excerpt.
 		if ( get_option( 'mako_use_excerpt', true ) && '' !== trim( $post->post_excerpt ) ) {
 			return $this->truncate_summary( wp_strip_all_tags( $post->post_excerpt ), $max );
 		}
 
-		// 2. SEO meta description (Yoast, RankMath).
+		// 3. SEO meta description (Yoast, RankMath).
 		$seo_desc = get_post_meta( $post->ID, '_yoast_wpseo_metadesc', true );
 		if ( empty( $seo_desc ) ) {
 			$seo_desc = get_post_meta( $post->ID, 'rank_math_description', true );
@@ -367,7 +375,7 @@ class Mako_Generator {
 			return $this->truncate_summary( $seo_desc, $max );
 		}
 
-		// 3. First substantial text paragraph from markdown.
+		// 4. First substantial text paragraph from markdown.
 		$paragraphs = preg_split( '/\n{2,}/', trim( $markdown ), -1, PREG_SPLIT_NO_EMPTY );
 		foreach ( $paragraphs as $para ) {
 			$trimmed = trim( $para );
@@ -392,8 +400,59 @@ class Mako_Generator {
 			}
 		}
 
-		// 4. Fallback: entity name.
+		// 5. Fallback: empty.
 		return '';
+	}
+
+	/**
+	 * Build a structured summary for WooCommerce products.
+	 *
+	 * Goal: answer "If a user asks an AI about this product, what should it respond?"
+	 * Format: "{Name}. {Short description or key attribute}. €{Price}. {Stock status}."
+	 */
+	private function derive_product_summary( WP_Post $post ): string {
+		$product = wc_get_product( $post->ID );
+		if ( ! $product ) {
+			return '';
+		}
+
+		$parts = array();
+
+		// Product name.
+		$parts[] = $product->get_name();
+
+		// Short description (one sentence max).
+		$short = wp_strip_all_tags( $product->get_short_description() );
+		$short = html_entity_decode( $short, ENT_QUOTES, 'UTF-8' );
+		$short = preg_replace( '/\s+/', ' ', trim( $short ) );
+		if ( '' !== $short ) {
+			// Take first sentence only.
+			$dot = mb_strpos( $short, '.' );
+			if ( false !== $dot && $dot < 120 ) {
+				$short = mb_substr( $short, 0, $dot + 1 );
+			} elseif ( mb_strlen( $short ) > 80 ) {
+				$short = mb_substr( $short, 0, 77 ) . '...';
+			}
+			$parts[] = $short;
+		}
+
+		// Price.
+		$price = $product->get_price();
+		if ( '' !== $price ) {
+			$currency = get_woocommerce_currency_symbol();
+			if ( $product->is_on_sale() && $product->get_regular_price() ) {
+				$parts[] = $currency . $product->get_sale_price() . ' (antes ' . $currency . $product->get_regular_price() . ')';
+			} else {
+				$parts[] = $currency . $price;
+			}
+		}
+
+		// Stock status.
+		if ( ! $product->is_in_stock() ) {
+			$parts[] = 'Agotado';
+		}
+
+		return implode( '. ', $parts );
 	}
 
 	private function truncate_summary( string $text, int $max ): string {
