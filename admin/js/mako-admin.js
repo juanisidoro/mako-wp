@@ -147,6 +147,11 @@
 	var coverFrame = null;
 
 	function openCoverSelector() {
+		if (typeof wp === 'undefined' || typeof wp.media === 'undefined') {
+			alert('Media library not available. Please reload the page.');
+			return;
+		}
+
 		if (coverFrame) {
 			coverFrame.open();
 			return;
@@ -167,17 +172,12 @@
 				? attachment.sizes.thumbnail.url
 				: attachment.url;
 
-			var $field = $('.mako-cover-field');
-			$field.find('.mako-cover-preview').remove();
-			$field.prepend('<img src="' + imgUrl + '" class="mako-cover-preview" alt="">');
+			var $thumb = $('#mako-cover-thumb');
+			$thumb.find('.mako-cover-preview').attr('src', imgUrl);
+			$thumb.show();
 
-			// Show remove button if not present.
-			if (!$field.find('.mako-btn-cover-remove').length) {
-				$field.find('.mako-btn-cover-select').after(
-					' <button type="button" class="button mako-btn-cover-remove">Remove</button>'
-				);
-			}
-			$field.find('.mako-btn-cover-select').text('Change');
+			$('.mako-btn-cover-select').text(config.i18n.change || 'Change');
+			$('.mako-btn-cover-remove').show();
 		});
 
 		coverFrame.open();
@@ -185,9 +185,9 @@
 
 	function removeCover() {
 		$('#mako_custom_cover').val('');
-		$('.mako-cover-preview').remove();
-		$('.mako-btn-cover-remove').remove();
-		$('.mako-btn-cover-select').text('Select Image');
+		$('#mako-cover-thumb').hide().find('.mako-cover-preview').attr('src', '');
+		$('.mako-btn-cover-remove').hide();
+		$('.mako-btn-cover-select').text(config.i18n.selectImage || 'Select Image');
 	}
 
 	// --- Preview ---

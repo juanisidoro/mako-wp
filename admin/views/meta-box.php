@@ -62,19 +62,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<td><label><?php esc_html_e( 'Cover', 'mako-wp' ); ?></label></td>
 				<td>
 					<div class="mako-cover-field">
-						<?php if ( $cover_url ) : ?>
-							<img src="<?php echo esc_url( $cover_url ); ?>" class="mako-cover-preview" alt="">
-						<?php endif; ?>
+						<div class="mako-cover-thumb" id="mako-cover-thumb" <?php echo $cover_url ? '' : 'style="display:none;"'; ?>>
+							<img src="<?php echo $cover_url ? esc_url( $cover_url ) : ''; ?>" class="mako-cover-preview" alt="">
+						</div>
 						<input type="hidden" name="mako_custom_cover" id="mako_custom_cover"
 							value="<?php echo esc_attr( $cover_id ); ?>">
-						<button type="button" class="button mako-btn-cover-select">
-							<?php echo $cover_url ? esc_html__( 'Change', 'mako-wp' ) : esc_html__( 'Select Image', 'mako-wp' ); ?>
-						</button>
-						<?php if ( $cover_url ) : ?>
-							<button type="button" class="button mako-btn-cover-remove">
+						<div class="mako-cover-actions">
+							<button type="button" class="button button-small mako-btn-cover-select">
+								<?php echo $cover_url ? esc_html__( 'Change', 'mako-wp' ) : esc_html__( 'Select Image', 'mako-wp' ); ?>
+							</button>
+							<button type="button" class="button button-small mako-btn-cover-remove" <?php echo $cover_url ? '' : 'style="display:none;"'; ?>>
 								<?php esc_html_e( 'Remove', 'mako-wp' ); ?>
 							</button>
-						<?php endif; ?>
+						</div>
 					</div>
 				</td>
 			</tr>

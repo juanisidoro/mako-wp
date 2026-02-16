@@ -362,7 +362,9 @@
 
 .mako-content-editor {
 	width: 100%;
+	max-width: 100%;
 	min-height: 280px;
+	box-sizing: border-box;
 	font-family: Consolas, Monaco, "Courier New", monospace;
 	font-size: 12px;
 	line-height: 1.5;
@@ -413,16 +415,30 @@
 /* Meta Box: Cover Field */
 .mako-cover-field {
 	display: flex;
-	align-items: center;
-	gap: 8px;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.mako-cover-thumb {
+	flex-shrink: 0;
 }
 
 .mako-cover-preview {
-	width: 60px;
-	height: 60px;
+	display: block;
+	width: 80px;
+	height: 80px;
+	max-width: 80px;
+	max-height: 80px;
 	object-fit: cover;
 	border-radius: 4px;
 	border: 1px solid #c3c4c7;
+}
+
+.mako-cover-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-top: 2px;
 }
 
 /* Meta Box: Action Buttons with Dashicons */
