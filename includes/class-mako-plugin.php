@@ -311,22 +311,9 @@ final class Mako_Plugin {
 			exit;
 		}
 
-		$domain = wp_parse_url( home_url(), PHP_URL_HOST );
-
 		$data = array(
-			'mako'     => MAKO_SPEC_VERSION,
-			'site'     => $domain,
-			'accept'   => 'text/mako+markdown',
-			'features' => array(
-				'content_negotiation' => (bool) get_option( 'mako_content_negotiation', true ),
-				'html_embedding'      => (bool) get_option( 'mako_html_embedding', true ),
-			),
-			'sitemap'  => get_option( 'mako_sitemap_enabled', true ) ? '/mako-sitemap.json' : null,
-			'spec'     => 'https://makospec.vercel.app',
+			'mako' => MAKO_SPEC_VERSION,
 		);
-
-		// Remove null values.
-		$data = array_filter( $data, fn( $v ) => null !== $v );
 
 		header( 'Content-Type: application/json; charset=utf-8' );
 		header( 'Access-Control-Allow-Origin: *' );
