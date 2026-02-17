@@ -210,12 +210,12 @@ Uninstall:
      │ X-Mako-Tokens     │
      │ X-Mako-Type       │
      │ X-Mako-Lang       │
-     │ X-Mako-Entity     │
-     │ X-Mako-Updated    │
-     │ X-Mako-Canonical  │
+     │ X-Mako-Actions    │
      │ Content-Type       │
      │ Vary: Accept       │
      │ Cache-Control      │
+     │ Last-Modified      │
+     │ Content-Location   │
      └────────┬──────────┘
               │
               ▼
@@ -439,13 +439,11 @@ X-Mako-Version: 1.0
 X-Mako-Tokens: {tokens}
 X-Mako-Type: {type}
 X-Mako-Lang: {language}
-X-Mako-Entity: {entity}
-X-Mako-Updated: {updated}T00:00:00Z
-X-Mako-Canonical: {permalink}
-X-Mako-Freshness: {freshness}           # if set
 X-Mako-Actions: {action1, action2}      # if actions exist
 Vary: Accept
 Cache-Control: public, max-age=3600
+Last-Modified: {updated as HTTP-date}
+Content-Location: {permalink}
 ```
 
 ### 5.6 Mako_Storage

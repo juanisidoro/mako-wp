@@ -22,18 +22,6 @@ class Mako_Headers {
 			'Cache-Control'   => get_option( 'mako_cache_control', 'public, max-age=3600' ),
 		);
 
-		if ( ! empty( $frontmatter['entity'] ) && 'Unknown' !== $frontmatter['entity'] ) {
-			$headers['X-Mako-Entity'] = $frontmatter['entity'];
-		}
-
-		if ( ! empty( $frontmatter['updated'] ) ) {
-			$headers['X-Mako-Updated'] = $frontmatter['updated'] . 'T00:00:00Z';
-		}
-
-		if ( ! empty( $frontmatter['freshness'] ) ) {
-			$headers['X-Mako-Freshness'] = $frontmatter['freshness'];
-		}
-
 		if ( ! empty( $frontmatter['actions'] ) && is_array( $frontmatter['actions'] ) ) {
 			$action_names = array_column( $frontmatter['actions'], 'name' );
 			if ( ! empty( $action_names ) ) {
@@ -41,10 +29,14 @@ class Mako_Headers {
 			}
 		}
 
-		if ( '' !== $canonical ) {
-			$headers['X-Mako-Canonical'] = $canonical;
-		} elseif ( ! empty( $frontmatter['canonical'] ) ) {
-			$headers['X-Mako-Canonical'] = $frontmatter['canonical'];
+		// Standard HTTP headers (replace custom X-Mako-Updated, X-Mako-Freshness, X-Mako-Canonical).
+		if ( ! empty( $frontmatter['updated'] ) ) {
+			$headers['Last-Modified'] = gmdate( 'D, d M Y H:i:s', strtotime( $frontmatter['updated'] ) ) . ' GMT';
+		}
+
+		$resolved_canonical = '' !== $canonical ? $canonical : ( $frontmatter['canonical'] ?? '' );
+		if ( '' !== $resolved_canonical ) {
+			$headers['Content-Location'] = $resolved_canonical;
 		}
 
 		return $headers;
