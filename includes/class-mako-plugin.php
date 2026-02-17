@@ -311,19 +311,18 @@ final class Mako_Plugin {
 			exit;
 		}
 
-		$storage = new Mako_Storage();
-		$stats   = $storage->get_stats();
-		$domain  = wp_parse_url( home_url(), PHP_URL_HOST );
+		$domain = wp_parse_url( home_url(), PHP_URL_HOST );
 
 		$data = array(
-			'mako'                  => MAKO_SPEC_VERSION,
-			'site'                  => $domain,
-			'total_pages'           => $stats['total'],
-			'content_negotiation'   => (bool) get_option( 'mako_content_negotiation', true ),
-			'html_embedding'        => (bool) get_option( 'mako_html_embedding', true ),
-			'accept'                => 'text/mako+markdown',
-			'sitemap'               => get_option( 'mako_sitemap_enabled', true ) ? '/mako-sitemap.json' : null,
-			'spec'                  => 'https://makospec.vercel.app',
+			'mako'     => MAKO_SPEC_VERSION,
+			'site'     => $domain,
+			'accept'   => 'text/mako+markdown',
+			'features' => array(
+				'content_negotiation' => (bool) get_option( 'mako_content_negotiation', true ),
+				'html_embedding'      => (bool) get_option( 'mako_html_embedding', true ),
+			),
+			'sitemap'  => get_option( 'mako_sitemap_enabled', true ) ? '/mako-sitemap.json' : null,
+			'spec'     => 'https://makospec.vercel.app',
 		);
 
 		// Remove null values.
